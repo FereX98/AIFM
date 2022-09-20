@@ -95,6 +95,7 @@ private:
 protected:
   friend class GenericDataFrameVector;
   friend class GenericConcurrentHopscotch;
+  friend class GenericConcurrentHopscotchLocal;
   friend class FarMemManager;
   friend class GCParallelMarker;
 
