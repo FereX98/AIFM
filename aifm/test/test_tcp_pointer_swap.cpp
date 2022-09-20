@@ -12,17 +12,26 @@ extern "C" {
 #include <memory>
 #include <vector>
 
+#define RUN_THE_TEST
+//#define RUN_AIFM
+#define RUN_UNMODIFIED
+
 using namespace far_memory;
 using namespace std;
 
-constexpr static uint64_t kCacheSize = 256 * Region::kSize;
-constexpr static uint64_t kFarMemSize = (1ULL << 32); // 4 GB.
-constexpr static uint64_t kWorkSetSize = 1 << 30;
+//constexpr static uint64_t kCacheSize = 256 * Region::kSize;
+constexpr static uint64_t kCacheSize = (1ULL << 35);  // 32 GB.
+constexpr static uint64_t kFarMemSize = (1ULL << 35); // 32 GB.
+constexpr static uint64_t kWorkSetSize = 12ULL << 30; // 12 GB
 constexpr static uint64_t kNumGCThreads = 12;
 constexpr static uint64_t kNumConnections = 300;
 
+// each AIFM object comes with a variable-sized object header
+// which is normally 16 bytes with no optional id length.
 struct Data4096 {
-  char data[4096];
+  //char data[4096];
+  char data[128];
+  //char data[1];
 };
 
 using Data_t = struct Data4096;
@@ -30,6 +39,9 @@ using Data_t = struct Data4096;
 constexpr static uint64_t kNumEntries = kWorkSetSize / sizeof(Data_t);
 
 void do_work(FarMemManager *manager) {
+
+  #ifdef RUN_THE_TEST
+  #ifdef RUN_AIFM
   std::vector<UniquePtr<Data_t>> vec;
 
   for (uint64_t i = 0; i < kNumEntries; i++) {
@@ -42,7 +54,7 @@ void do_work(FarMemManager *manager) {
     vec.emplace_back(std::move(far_mem_ptr));
   }
 
-  for (uint64_t i = 0; i < kNumEntries; i++) {
+  /*for (uint64_t i = 0; i < kNumEntries; i++) {
     {
       DerefScope scope;
       const auto raw_const_ptr = vec[i].deref(scope);
@@ -52,7 +64,34 @@ void do_work(FarMemManager *manager) {
         }
       }
     }
+  }*/
+  #endif // RUN_AIFM
+
+  #ifdef RUN_UNMODIFIED
+
+  //std::vector<unique_ptr<Data_t>> vec;
+  std::vector<Data_t*> vec;
+
+  for (uint64_t i = 0; i < kNumEntries; i++) {
+    //auto mem_ptr = make_unique<Data_t>();
+    Data_t* mem_ptr = (Data_t*)malloc(sizeof(Data_t));
+    memset(mem_ptr->data, static_cast<char>(i), sizeof(Data_t));
+    //vec.emplace_back(std::move(mem_ptr));
+    vec.emplace_back(mem_ptr);
   }
+
+  /*for (uint64_t i = 0; i < kNumEntries; i++) {
+    //const auto raw_ptr = std::move(vec[i]);
+    Data_t* raw_ptr = vec[i];
+    for (uint32_t j = 0; j < sizeof(Data_t); j++) {
+      if (raw_ptr->data[j] != static_cast<char>(i)) {
+        goto fail;
+      }
+    }
+  }*/
+
+  #endif // RUN_UNMODIFIED
+  #endif // RUN_THE_TEST
 
   cout << "Passed" << endl;
   return;
