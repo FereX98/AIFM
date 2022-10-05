@@ -106,6 +106,7 @@ private:
   using Index_t = uint64_t;
   using Pattern_t = int64_t;
 
+  // Be reminded that this parameter on memory server also needed to be changed and recompiled
   constexpr static uint32_t kPreferredChunkSize = 4096;
   constexpr static uint32_t kRealChunkNumEntries =
       std::max(static_cast<uint32_t>(1),
@@ -134,6 +135,7 @@ private:
   std::unique_ptr<
       Prefetcher<decltype(kInduceFn), decltype(kInferFn), decltype(kMappingFn)>>
       prefetcher_;
+  // bool dynamic_prefetch_enabled_ = false;  
   bool dynamic_prefetch_enabled_ = true;  
 
   friend class FarMemTest;

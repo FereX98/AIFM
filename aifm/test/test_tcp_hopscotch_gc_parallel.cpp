@@ -8,6 +8,7 @@ extern "C" {
 #include "manager.hpp"
 
 #include <algorithm>
+#include <chrono>
 #include <cstdlib>
 #include <iostream>
 #include <string>
@@ -16,10 +17,10 @@ extern "C" {
 using namespace far_memory;
 using namespace std;
 
-constexpr static uint32_t kNumThreads = 23;
+constexpr static uint32_t kNumThreads = 128;
 constexpr static uint32_t kKeyMaxLen = 50;
 constexpr static uint32_t kValMaxLen = 100;
-constexpr static uint32_t kHashTableNumEntriesShift = 19;
+constexpr static uint32_t kHashTableNumEntriesShift = 20;
 constexpr static uint32_t kHashTableRemoteDataSize =
     (Object::kHeaderSize + kKeyMaxLen + kValMaxLen) *
     (1 << kHashTableNumEntriesShift) * kNumThreads;
@@ -28,8 +29,8 @@ constexpr static uint32_t kNumKVPairs =
     kLoadFactor * (1 << kHashTableNumEntriesShift);
 
 constexpr static uint64_t kCacheSize = (128ULL << 20);
-constexpr static uint64_t kFarMemSize = (4ULL << 30);
-constexpr static uint32_t kNumGCThreads = 12;
+constexpr static uint64_t kFarMemSize = (16ULL << 30);
+constexpr static uint32_t kNumGCThreads = 96;
 constexpr static uint64_t kNumConnections = 300;
 
 struct Op {
@@ -110,6 +111,8 @@ void do_work(FarMemManager *manager) {
     std::random_shuffle(ops[i].begin(), ops[i].end());
   }
 
+  auto start_ts = chrono::steady_clock::now();
+
   for (uint32_t i = 0; i < kNumThreads; i++) {
     threads.push_back(rt::Thread([&, i]() { thread_work_fn(i, &hopscotch); }));
   }
@@ -117,6 +120,12 @@ void do_work(FarMemManager *manager) {
   for (uint32_t i = 0; i < kNumThreads; i++) {
     threads[i].Join();
   }
+
+  auto end_ts = chrono::steady_clock::now();
+
+  auto time_MS =
+      chrono::duration_cast<chrono::milliseconds>(end_ts - start_ts).count();
+  std::cout << time_MS << std::endl;
 
   std::cout << "Passed" << std::endl;
 }

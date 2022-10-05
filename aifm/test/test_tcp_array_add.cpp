@@ -17,15 +17,19 @@ extern "C" {
 #include <cstdio>
 
 #define RUN_THE_TEST
-//#define RUN_AIFM
-#define RUN_UNMODIFIED
+#define RUN_AIFM
+//#define RUN_UNMODIFIED
+
+#ifdef RUN_AIFM
+//#define DISABLE_PREFETCH
+#endif // RUN_AIFM
 
 using namespace far_memory;
 using namespace std;
 
 //constexpr static uint64_t kCacheSize = (128ULL << 20);
-constexpr static uint64_t kCacheSize = (4ULL << 30);
-constexpr static uint64_t kFarMemSize = (4ULL << 30);
+constexpr static uint64_t kCacheSize = (8ULL << 30);
+constexpr static uint64_t kFarMemSize = (8ULL << 30);
 constexpr static uint32_t kNumGCThreads = 12;
 constexpr static uint32_t kNumEntries =
     (8ULL << 20); // So the array size is larger than the local cache size.
@@ -73,6 +77,12 @@ void do_work(FarMemManager *manager) {
   auto array_B = manager->allocate_array<uint64_t, kNumEntries>();
   auto array_C = manager->allocate_array<uint64_t, kNumEntries>();
   #endif // RUN_AIFM
+
+  #ifdef DISABLE_PREFETCH
+  array_A.disable_prefetch();
+  array_B.disable_prefetch();
+  array_C.disable_prefetch();
+  #endif // DISABLE_PREFETCH
 
   #ifdef RUN_UNMODIFIED
   printf("array creation\n");

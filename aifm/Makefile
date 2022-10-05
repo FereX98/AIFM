@@ -92,6 +92,9 @@ test_shared_pointer_obj = $(test_shared_pointer_src:.cpp=.o)
 test_embedded_pointer_src = test/test_embedded_pointer.cpp
 test_embedded_pointer_obj = $(test_embedded_pointer_src:.cpp=.o)
 
+test_tcp_random_block_src = test/test_tcp_random_block.cpp
+test_tcp_random_block_obj = $(test_tcp_random_block_src:.cpp=.o)
+
 lib_src = $(wildcard src/*.cpp)
 lib_src := $(filter-out src/tcp_device_server.cpp,$(lib_src))
 lib_obj = $(lib_src:.cpp=.o)
@@ -125,7 +128,7 @@ bin/test_hopscotch_gc_serial bin/test_hopscotch_parallel bin/test_hopscotch_gc_p
 bin/test_tcp_hopscotch_gc_serial bin/test_tcp_hopscotch_gc_parallel bin/test_hashtable_clock_replacement \
 bin/test_local_skiplist_serial bin/test_local_list bin/test_list bin/test_list_gc bin/test_queue_gc bin/test_stack_gc \
 bin/test_pointer_swap_rw_api bin/test_array_add_rw_api bin/test_dataframe_vector bin/test_csv_reader \
-bin/test_shared_pointer bin/test_embedded_pointer libaifm.a
+bin/test_shared_pointer bin/test_embedded_pointer bin/test_tcp_random_block libaifm.a
 
 bin/test_pointer_noswap: $(test_pointer_noswap_obj) $(librt_libs) $(RUNTIME_DEPS) $(lib_obj)
 	$(LDXX) -o $@ $(test_pointer_noswap_obj) $(lib_obj) $(librt_libs) $(RUNTIME_LIBS) $(LDFLAGS)
@@ -216,6 +219,9 @@ bin/test_shared_pointer: $(test_shared_pointer_obj) $(librt_libs) $(RUNTIME_DEPS
 
 bin/test_embedded_pointer: $(test_embedded_pointer_obj) $(librt_libs) $(RUNTIME_DEPS) $(lib_obj)
 	$(LDXX) -o $@ $(test_embedded_pointer_obj) $(lib_obj) $(librt_libs) $(RUNTIME_LIBS) $(LDFLAGS)
+
+bin/test_tcp_random_block: $(test_tcp_random_block_obj) $(librt_libs) $(RUNTIME_DEPS) $(lib_obj)
+	$(LDXX) -o $@ $(test_tcp_random_block_obj) $(lib_obj) $(librt_libs) $(RUNTIME_LIBS) $(LDFLAGS)
 
 $(tcp_device_server_obj): $(tcp_device_server_src)
 	$(CXX) $(CXXFLAGS) -c $< -o $@

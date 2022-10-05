@@ -13,15 +13,15 @@ extern "C" {
 #include <vector>
 
 #define RUN_THE_TEST
-//#define RUN_AIFM
-#define RUN_UNMODIFIED
+#define RUN_AIFM
+//#define RUN_UNMODIFIED
 
 using namespace far_memory;
 using namespace std;
 
 //constexpr static uint64_t kCacheSize = 256 * Region::kSize;
-constexpr static uint64_t kCacheSize = (1ULL << 35);  // 32 GB.
-constexpr static uint64_t kFarMemSize = (1ULL << 35); // 32 GB.
+constexpr static uint64_t kCacheSize = (3ULL << 30);  // 3 GB, 25%
+constexpr static uint64_t kFarMemSize = (3ULL << 33); // 24 GB.
 constexpr static uint64_t kWorkSetSize = 12ULL << 30; // 12 GB
 constexpr static uint64_t kNumGCThreads = 12;
 constexpr static uint64_t kNumConnections = 300;
@@ -36,6 +36,8 @@ struct Data4096 {
 
 using Data_t = struct Data4096;
 
+const int magic = 42;
+
 constexpr static uint64_t kNumEntries = kWorkSetSize / sizeof(Data_t);
 
 void do_work(FarMemManager *manager) {
@@ -49,22 +51,31 @@ void do_work(FarMemManager *manager) {
     {
       DerefScope scope;
       auto raw_mut_ptr = far_mem_ptr.deref_mut(scope);
+      //raw_mut_ptr->data[magic] = static_cast<char>(i);
       memset(raw_mut_ptr->data, static_cast<char>(i), sizeof(Data_t));
     }
     vec.emplace_back(std::move(far_mem_ptr));
   }
 
-  /*for (uint64_t i = 0; i < kNumEntries; i++) {
+  for (uint64_t i = 0; i < kNumEntries; i++) {
+    //time_t t;
+    //srand((unsigned) std::time(&t));
+    //int index = rand() % kNumEntries;
     {
       DerefScope scope;
       const auto raw_const_ptr = vec[i].deref(scope);
+      //const auto raw_const_ptr = vec[index].deref(scope);
+      //if(raw_const_ptr->data[magic] != static_cast<char>(index)) {
+      //  goto fail;
+      //}
+      //break;
       for (uint32_t j = 0; j < sizeof(Data_t); j++) {
         if (raw_const_ptr->data[j] != static_cast<char>(i)) {
           goto fail;
         }
       }
     }
-  }*/
+  }
   #endif // RUN_AIFM
 
   #ifdef RUN_UNMODIFIED
@@ -73,6 +84,7 @@ void do_work(FarMemManager *manager) {
   std::vector<Data_t*> vec;
 
   for (uint64_t i = 0; i < kNumEntries; i++) {
+    //DerefScope scope;
     //auto mem_ptr = make_unique<Data_t>();
     Data_t* mem_ptr = (Data_t*)malloc(sizeof(Data_t));
     memset(mem_ptr->data, static_cast<char>(i), sizeof(Data_t));
@@ -80,7 +92,8 @@ void do_work(FarMemManager *manager) {
     vec.emplace_back(mem_ptr);
   }
 
-  /*for (uint64_t i = 0; i < kNumEntries; i++) {
+  for (uint64_t i = 0; i < kNumEntries; i++) {
+    //DerefScope scope;
     //const auto raw_ptr = std::move(vec[i]);
     Data_t* raw_ptr = vec[i];
     for (uint32_t j = 0; j < sizeof(Data_t); j++) {
@@ -88,7 +101,7 @@ void do_work(FarMemManager *manager) {
         goto fail;
       }
     }
-  }*/
+  }
 
   #endif // RUN_UNMODIFIED
   #endif // RUN_THE_TEST
