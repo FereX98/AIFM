@@ -3,12 +3,14 @@
 #include "hash.hpp"
 
 #include <cstring>
+#include <iostream>
 
 namespace far_memory {
 
 FORCE_INLINE GenericConcurrentHopscotchLocal::BucketEntry::BucketEntry() {
   bitmap = timestamp = 0;
-  ptr.nullify();
+  //ptr.nullify();
+  ptr = nullptr;
 }
 
 FORCE_INLINE void GenericConcurrentHopscotchLocal::_get(uint8_t key_len,
@@ -96,7 +98,7 @@ FORCE_INLINE bool GenericConcurrentHopscotchLocal::__get(uint8_t key_len,
   uint32_t retry_counter = 0;
 
   auto get_once = [&]<bool Lock>() -> bool {
-    retry:
+    //retry:
       if constexpr (Lock) {
         while (unlikely(!bucket->spin.TryLockWp())) {
           thread_yield();
@@ -111,19 +113,26 @@ FORCE_INLINE bool GenericConcurrentHopscotchLocal::__get(uint8_t key_len,
       uint32_t bitmap = bucket->bitmap;
       while (bitmap) {
         auto offset = helpers::bsf_32(bitmap);
-        // shi mark
         auto &ptr = buckets_[bucket_idx + offset].ptr;
-        //auto ptr = buckets_[bucket_idx + offset].ptr;
-        // shi mark
-        if (likely(!ptr.is_null())) {
-        //if (likely(!ptr)) {
-          auto *obj_val_ptr = ptr._deref<false, false>();
-          if (unlikely(!obj_val_ptr)) {
-            spin_guard.reset();
-            process_evac_notifier_stash();
-            thread_yield();
-            goto retry;
-          }
+        //if (likely(!ptr.is_null())) {
+        if (likely(ptr)) {
+          //auto *obj_val_ptr = ptr._deref<false, false>();
+          auto *obj_val_ptr = reinterpret_cast<char *>(ptr) + Object::kHeaderSize;
+          // Shi's guess:
+          // When an object is swapped out, its local counterpart is removed from the local hash table, see `GenericConcurrentHopscotch::do_evac_notifier`.
+          // The ptr is nullified before the bitmap. Therefore there may be times when a bucket is consider to be not empty according to the bitmap but the pointer is already nullified, so the if condition below is met.
+          // Then we should flush all pending evac_notifier to make sure that bitmap is properly cleared before we do the get again.
+          // Hence the retry.
+          // For our tests we should never let objects be evacuated. Therefore there is no need to do this check.
+          //if (unlikely(!obj_val_ptr)) {
+          //  spin_guard.reset();
+          //  process_evac_notifier_stash();
+          //  thread_yield();
+          //  goto retry;
+          //}
+          // Shi: structure of a hash table object (see object.hpp):
+          // |<------------------ header ------------------>|
+          // |ptr_addr(6B)|data_len(2B)|ds_id(1B)|id_len(1B)|obj_data(value+EvacNotifierMeta)|key(obj_id)
           auto obj = Object(reinterpret_cast<uint64_t>(obj_val_ptr) -
                             Object::kHeaderSize);
           if (obj.get_obj_id_len() == key_len) {

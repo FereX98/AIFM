@@ -199,6 +199,15 @@ FarMemManager::allocate_concurrent_hopscotch(uint32_t local_num_entries_shift,
 }
 
 template <typename K, typename V>
+FORCE_INLINE ConcurrentHopscotchLocal<K, V>
+FarMemManager::allocate_concurrent_hopscotch_local(uint32_t local_num_entries_shift,
+                                             uint32_t remote_num_entries_shift,
+                                             uint64_t remote_data_size) {
+  return ConcurrentHopscotchLocal<K, V>(allocate_ds_id(), local_num_entries_shift,
+                                   remote_num_entries_shift, remote_data_size);
+}
+
+template <typename K, typename V>
 FORCE_INLINE ConcurrentHopscotch<K, V> *
 FarMemManager::allocate_concurrent_hopscotch_heap(
     uint32_t local_num_entries_shift, uint32_t remote_num_entries_shift,

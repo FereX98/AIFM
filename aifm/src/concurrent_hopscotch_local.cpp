@@ -55,9 +55,13 @@ GenericConcurrentHopscotchLocal::~GenericConcurrentHopscotchLocal() {
   // Free local data.
   for (uint32_t i = 0; i < kNumEntries_; i++) {
     auto &ptr = buckets_[i].ptr;
-    DerefScope scope;
-    if (ptr.deref(scope)) {
-      ptr.free();
+    //DerefScope scope;
+    //if (ptr.deref(scope)) {
+    //  ptr.free();
+    //}
+    if(ptr) {
+      free(ptr);
+      ptr = nullptr;
     }
   }
   // Free remote data.
@@ -68,7 +72,9 @@ void GenericConcurrentHopscotchLocal::do_evac_notifier(EvacNotifierMeta meta) {
   auto *bucket =
       reinterpret_cast<BucketEntry *>(static_cast<uint64_t>(meta.anchor_addr));
   auto *entry = bucket + meta.offset;
-  entry->ptr.nullify();
+  // Shi: This function should never be called.
+  BUG();
+  //entry->ptr.nullify();
 
   if (likely(bucket->spin.TryLock())) {
     auto guard = helpers::finally([&]() { bucket->spin.Unlock(); });
@@ -120,16 +126,19 @@ retry:
     auto *entry = bucket + offset;
     auto &ptr = entry->ptr;
 #ifdef HASHTABLE_EXCLUSIVE
-    auto *obj_val_ptr = ptr._deref<true, false>();
+    //auto *obj_val_ptr = ptr._deref<true, false>();
+    auto *obj_val_ptr = reinterpret_cast<char *>(ptr) + Object::kHeaderSize;
 #else
-    auto *obj_val_ptr = deref(ptr, !swap_in);
+    //auto *obj_val_ptr = deref(ptr, !swap_in);
+    auto *obj_val_ptr = reinterpret_cast<char *>(ptr) + Object::kHeaderSize;
 #endif
-    if (unlikely(!obj_val_ptr)) {
-      bucket_lock_guard.reset();
-      process_evac_notifier_stash();
-      thread_yield();
-      goto retry;
-    }
+    // Shi: see `GenericConcurrentHopscotchLocal::__get` for guess on this check
+    //if (unlikely(!obj_val_ptr)) {
+    //  bucket_lock_guard.reset();
+    //  process_evac_notifier_stash();
+    //  thread_yield();
+    //  goto retry;
+    //}
 
     auto obj =
         Object(reinterpret_cast<uint64_t>(obj_val_ptr) - Object::kHeaderSize);
@@ -137,20 +146,35 @@ retry:
       auto obj_data_len = obj.get_data_len();
       if (strncmp(reinterpret_cast<const char *>(obj_val_ptr) + obj_data_len,
                   reinterpret_cast<const char *>(key), key_len) == 0) {
+        // Shi: If data length changes, need to reallocate the object
         if (unlikely(obj_data_len != val_len + sizeof(EvacNotifierMeta))) {
           auto new_data_size = val_len + sizeof(EvacNotifierMeta);
-          if (!FarMemManagerFactory::get()->reallocate_generic_unique_ptr_nb(
-                  *static_cast<DerefScope *>(nullptr), &ptr, new_data_size,
-                  val)) {
-            bucket_lock_guard.reset();
-            FarMemManagerFactory::get()->mutator_wait_for_gc_cache();
-            goto retry;
+          // Shi: if allocation failure, trigger GC and try again later
+          // shouldn't fail with malloc
+          //if (!FarMemManagerFactory::get()->reallocate_generic_unique_ptr_nb(
+          //        *static_cast<DerefScope *>(nullptr), &ptr, new_data_size,
+          //        val)) {
+          //  bucket_lock_guard.reset();
+          //  FarMemManagerFactory::get()->mutator_wait_for_gc_cache();
+          //  goto retry;
+          //}
+          auto new_obj_ptr = reinterpret_cast<char *>(malloc(Object::kHeaderSize + new_data_size + key_len));
+          if (very_unlikely(!new_obj_ptr)) {
+            // Shi: malloc failed, throw bug
+            BUG();
           }
-          auto new_obj_val_ptr = ptr._deref<true, false>();
+          Object(reinterpret_cast<uint64_t>(new_obj_ptr), ds_id_, val_len + sizeof(EvacNotifierMeta), key_len, key);
+          memcpy(new_obj_ptr + Object::kHeaderSize, val, new_data_size);
+          // Shi: no idea why we need this here, just following `FarMemManager::reallocate_generic_unique_ptr_nb`, add one to be safe
+          wmb();
+          free(ptr);
+          ptr = reinterpret_cast<void *>(new_obj_ptr);
+          //auto new_obj_val_ptr = ptr._deref<true, false>();
+          auto new_obj_val_ptr = new_obj_ptr + Object::kHeaderSize;
 #ifndef HASHTABLE_EXCLUSIVE
-          if (swap_in) {
-            ptr.meta().clear_dirty();
-          }
+          //if (swap_in) {
+          //  ptr.meta().clear_dirty();
+          //}
 #endif
           assert(new_obj_val_ptr);
           auto new_meta = reinterpret_cast<EvacNotifierMeta *>(
@@ -169,8 +193,12 @@ retry:
   // The key does not exist. Use linear probing to find the first empty slot.
   while (bucket_idx < kNumEntries_) {
     auto *entry = &buckets_[bucket_idx];
+    // Shi: Here for new value, we only need a non-0 value to occupy the pointer,
+    // So seems like we can keep using BucketEntry::kBusyPtr, i.e., 0x101U,
+    // which is not used by any rational address
     if (__sync_bool_compare_and_swap(reinterpret_cast<uint64_t *>(&entry->ptr),
-                                     FarMemPtrMeta::kNull,
+                                     //FarMemPtrMeta::kNull,
+                                     NULL,
                                      BucketEntry::kBusyPtr)) {
       break;
     }
@@ -216,15 +244,16 @@ retry:
       // Swap entry [closest_bucket + offset] and [bucket_idx]
       auto *from_entry = &buckets_[idx + offset];
       auto &from_entry_ptr = from_entry->ptr;
-      auto *from_obj_val_ptr = from_entry_ptr._deref<false, false>();
+      //auto *from_obj_val_ptr = from_entry_ptr._deref<false, false>();
+      auto *from_obj_val_ptr = reinterpret_cast<char *>(from_entry_ptr) + Object::kHeaderSize;
       auto *to_entry = &buckets_[bucket_idx];
-      if (unlikely(!from_obj_val_ptr)) {
-        bucket_lock_guard.reset();
-        to_entry->ptr.nullify();
-        process_evac_notifier_stash();
-        thread_yield();
-        goto retry;
-      }
+      //if (unlikely(!from_obj_val_ptr)) {
+      //  bucket_lock_guard.reset();
+      //  to_entry->ptr.nullify();
+      //  process_evac_notifier_stash();
+      //  thread_yield();
+      //  goto retry;
+      //}
 
       auto from_obj = Object(reinterpret_cast<uint64_t>(from_obj_val_ptr) -
                              Object::kHeaderSize);
@@ -236,7 +265,13 @@ retry:
       assert((anchor_entry->bitmap & (1 << distance)) == 0);
       anchor_entry->bitmap |= (1 << distance);
       anchor_entry->timestamp++;
-      to_entry->ptr.move(from_entry->ptr, BucketEntry::kBusyPtr);
+      // Shi: the victim entry moves from from_entry to to_entry
+      // and the from_entry is set to `BucketEntry::kBusyPtr`
+      // Shi**: Are here concurrency issues if we are not locking with `FarMemManager::lock_object`?
+      // My guess is no for now, as that lock is only used with migration-related operations (and free)
+      //to_entry->ptr.move(from_entry->ptr, BucketEntry::kBusyPtr);
+      to_entry->ptr = from_entry->ptr;
+      from_entry->ptr = reinterpret_cast<void *>(BucketEntry::kBusyPtr);
       assert(anchor_entry->bitmap & (1 << offset));
       anchor_entry->bitmap ^= (1 << offset);
 
@@ -254,18 +289,27 @@ retry:
 
   // Allocate memory.
   auto *final_entry = &buckets_[bucket_idx];
-  auto *ptr = &(final_entry->ptr);
-  if (!FarMemManagerFactory::get()->allocate_generic_unique_ptr_nb(
-          ptr, ds_id_, sizeof(EvacNotifierMeta) + val_len, key_len, key)) {
-    bucket_lock_guard.reset();
-    FarMemManagerFactory::get()->mutator_wait_for_gc_cache();
-    goto retry;
+  //auto *ptr = &(final_entry->ptr);
+  auto &ptr = final_entry->ptr;
+  //if (!FarMemManagerFactory::get()->allocate_generic_unique_ptr_nb(
+  //        ptr, ds_id_, sizeof(EvacNotifierMeta) + val_len, key_len, key)) {
+  //  bucket_lock_guard.reset();
+  //  FarMemManagerFactory::get()->mutator_wait_for_gc_cache();
+  //  goto retry;
+  //}
+  auto new_obj_ptr = reinterpret_cast<char *>(malloc(Object::kHeaderSize + val_len + sizeof(EvacNotifierMeta) + key_len));
+  if (very_unlikely(!new_obj_ptr)) {
+    // Shi: malloc failed, throw bug
+    BUG();
   }
-  auto *val_ptr = ptr->_deref<true, false>();
+  Object(reinterpret_cast<uint64_t>(new_obj_ptr), ds_id_, val_len + sizeof(EvacNotifierMeta), key_len, key);
+  ptr = reinterpret_cast<void *>(new_obj_ptr);
+  //auto *val_ptr = ptr->_deref<true, false>();
+  auto *val_ptr = reinterpret_cast<char *>(ptr) + Object::kHeaderSize;
 #ifndef HASHTABLE_EXCLUSIVE
-  if (swap_in) {
-    ptr->meta().clear_dirty();
-  }
+  //if (swap_in) {
+  //  ptr->meta().clear_dirty();
+  //}
 #endif
   assert(val_ptr);
   auto *meta = reinterpret_cast<EvacNotifierMeta *>(
@@ -297,7 +341,7 @@ bool GenericConcurrentHopscotchLocal::_remove(uint8_t key_len, const uint8_t *ke
   auto *bucket = &(buckets_[bucket_idx]);
   bool removed = false;
 
-retry:
+//retry:
   while (unlikely(!bucket->spin.TryLockWp())) {
     thread_yield();
   }
@@ -308,13 +352,15 @@ retry:
     auto offset = helpers::bsf_32(bitmap);
     auto *entry = &buckets_[bucket_idx + offset];
     auto &ptr = entry->ptr;
-    auto *obj_val_ptr = ptr._deref<false, false>();
-    if (unlikely(!obj_val_ptr)) {
-      spin_guard.reset();
-      process_evac_notifier_stash();
-      thread_yield();
-      goto retry;
-    }
+    //auto *obj_val_ptr = ptr._deref<false, false>();
+    auto *obj_val_ptr = reinterpret_cast<char *>(ptr) + Object::kHeaderSize;
+    // Shi: see `GenericConcurrentHopscotchLocal::__get` for guess on this check
+    //if (unlikely(!obj_val_ptr)) {
+    //  spin_guard.reset();
+    //  process_evac_notifier_stash();
+    //  thread_yield();
+    //  goto retry;
+    //}
 
     auto obj =
         Object(reinterpret_cast<uint64_t>(obj_val_ptr) - Object::kHeaderSize);
@@ -324,7 +370,9 @@ retry:
                   reinterpret_cast<const char *>(key), key_len) == 0) {
         assert(bucket->bitmap & (1 << offset));
         bucket->bitmap ^= (1 << offset);
-        ptr.free(/* race = */ true);
+        //ptr.free(/* race = */ true);
+        free(ptr);
+        ptr = nullptr;
 #ifdef HASHTABLE_EXCLUSIVE
         return true;
 #else

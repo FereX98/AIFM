@@ -5,6 +5,7 @@
 #include "array.hpp"
 #include "cb.hpp"
 #include "concurrent_hopscotch.hpp"
+#include "concurrent_hopscotch_local.hpp"
 #include "device.hpp"
 #include "helpers.hpp"
 #include "internal/ds_info.hpp"
@@ -176,6 +177,10 @@ public:
   allocate_concurrent_hopscotch(uint32_t local_num_entries_shift,
                                 uint32_t remote_num_entries_shift,
                                 uint64_t remote_data_size);
+  GenericConcurrentHopscotchLocal
+  allocate_concurrent_hopscotch_local(uint32_t local_num_entries_shift,
+                                uint32_t remote_num_entries_shift,
+                                uint64_t remote_data_size);
   GenericConcurrentHopscotch *
   allocate_concurrent_hopscotch_heap(uint32_t local_num_entries_shift,
                                      uint32_t remote_num_entries_shift,
@@ -183,6 +188,11 @@ public:
   template <typename K, typename V>
   ConcurrentHopscotch<K, V>
   allocate_concurrent_hopscotch(uint32_t local_num_entries_shift,
+                                uint32_t remote_num_entries_shift,
+                                uint64_t remote_data_size);
+  template <typename K, typename V>
+  ConcurrentHopscotchLocal<K, V>
+  allocate_concurrent_hopscotch_local(uint32_t local_num_entries_shift,
                                 uint32_t remote_num_entries_shift,
                                 uint64_t remote_data_size);
   template <typename K, typename V>

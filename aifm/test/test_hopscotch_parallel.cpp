@@ -4,6 +4,7 @@ extern "C" {
 #include "thread.h"
 
 #include "concurrent_hopscotch.hpp"
+#include "concurrent_hopscotch_local.hpp"
 #include "helpers.hpp"
 #include "manager.hpp"
 
@@ -13,10 +14,12 @@ extern "C" {
 #include <string>
 #include <vector>
 
+#define RUN_LOCAL
+
 using namespace far_memory;
 using namespace std;
 
-constexpr static uint32_t kNumThreads = 23;
+constexpr static uint32_t kNumThreads = 10;
 constexpr static uint32_t kKeyMaxLen = 5;
 constexpr static uint32_t kValMaxLen = 10;
 constexpr static uint32_t kHashTableNumEntriesShift = 17;
@@ -49,7 +52,11 @@ std::string random_string(uint32_t max_len) {
   return str;
 }
 
+#ifdef RUN_LOCAL
+void thread_work_fn(int tid, GenericConcurrentHopscotchLocal *hopscotch) {
+#else
 void thread_work_fn(int tid, GenericConcurrentHopscotch *hopscotch) {
+#endif
   for (auto &op : ops[tid]) {
     if (op.opcode == Op::Get) {
       uint16_t val_len;
@@ -62,6 +69,7 @@ void thread_work_fn(int tid, GenericConcurrentHopscotch *hopscotch) {
       }
       auto val = std::string(raw_val, val_len);
       std::string prefix = val.substr(0, val.find("_"));
+      cout << val << endl;
       auto suffix = std::stoi(val.substr(val.find("_") + 1));
       if (prefix != op.key || suffix < 0 ||
           suffix >= static_cast<int>(kNumThreads)) {
@@ -85,7 +93,11 @@ void thread_work_fn(int tid, GenericConcurrentHopscotch *hopscotch) {
 void do_work(FarMemManager *manager) {
   cout << "Running " << __FILE__ "..." << endl;
 
+#ifdef RUN_LOCAL
+  auto hopscotch = manager->allocate_concurrent_hopscotch_local(
+#else
   auto hopscotch = manager->allocate_concurrent_hopscotch(
+#endif
       kHashTableNumEntriesShift, kHashTableNumEntriesShift,
       kHashTableRemoteDataSize);
 

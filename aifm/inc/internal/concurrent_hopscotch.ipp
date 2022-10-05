@@ -114,6 +114,11 @@ FORCE_INLINE bool GenericConcurrentHopscotch::__get(uint8_t key_len,
         auto &ptr = buckets_[bucket_idx + offset].ptr;
         if (likely(!ptr.is_null())) {
           auto *obj_val_ptr = ptr._deref<false, false>();
+          // Shi's guess: 
+          // When an object is swapped out, its local counterpart is removed from the local hash table, see `GenericConcurrentHopscotch::do_evac_notifier`.
+          // The ptr is nullified before the bitmap. Therefore there may be times when a bucket is consider to be not empty according to the bitmap but the pointer is already nullified, so the if condition below is met.
+          // Then we should flush all pending evac_notifier to make sure that bitmap is properly cleared before we do the get again.
+          // Hence the retry.
           if (unlikely(!obj_val_ptr)) {
             spin_guard.reset();
             process_evac_notifier_stash();

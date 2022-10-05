@@ -816,6 +816,14 @@ bool FarMemManager::reallocate_generic_unique_ptr_nb(const DerefScope &scope,
   return true;
 }
 
+GenericConcurrentHopscotchLocal
+FarMemManager::allocate_concurrent_hopscotch_local(uint32_t local_num_entries_shift,
+                                             uint32_t remote_num_entries_shift,
+                                             uint64_t remote_data_size) {
+  return GenericConcurrentHopscotchLocal(allocate_ds_id(), local_num_entries_shift,
+                                    remote_num_entries_shift, remote_data_size);
+}
+
 GenericConcurrentHopscotch
 FarMemManager::allocate_concurrent_hopscotch(uint32_t local_num_entries_shift,
                                              uint32_t remote_num_entries_shift,

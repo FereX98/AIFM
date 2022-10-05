@@ -21,9 +21,9 @@ private:
     uint32_t bitmap;
     rt::Spin spin;
     uint64_t timestamp;
-    // here change the pointer to raw pointer
-    GenericUniquePtr ptr;
-    void *local_ptr;
+    // Shi: here change the pointer to raw pointer
+    //GenericUniquePtr ptr;
+    void *ptr;
     
 
     BucketEntry();
