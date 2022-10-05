@@ -52,7 +52,7 @@ StdDataFrame<Index_t> load_data(FarMemManager* manager)
 {
     return read_csv<-1, int, SimpleTime, SimpleTime, int, double, double, double, int, char, double,
                     double, int, double, double, double, double, double, double, double>(
-        manager, "/mnt/all.csv", "VendorID", "tpep_pickup_datetime", "tpep_dropoff_datetime",
+        manager, "/mnt/ssd/data/all.csv", "VendorID", "tpep_pickup_datetime", "tpep_dropoff_datetime",
         "passenger_count", "trip_distance", "pickup_longitude", "pickup_latitude", "RatecodeID",
         "store_and_fwd_flag", "dropoff_longitude", "dropoff_latitude", "payment_type",
         "fare_amount", "extra", "mta_tax", "tip_amount", "tolls_amount", "improvement_surcharge",
@@ -325,8 +325,12 @@ void analyze_trip_durations_of_timestamps(far_memory::FarMemManager* manager,
 void do_work(FarMemManager* manager)
 {
     std::chrono::time_point<std::chrono::steady_clock> times[10];
+    std::chrono::time_point<std::chrono::steady_clock> time_before_load;
+    std::cout << "start loading" << std::endl;
+    time_before_load = std::chrono::steady_clock::now();
     auto df  = load_data(manager);
     times[0] = std::chrono::steady_clock::now();
+    std::cout << "time taken to load: " << std::chrono::duration_cast<std::chrono::microseconds>(times[0] - time_before_load).count() << " us" << std::endl;
     print_number_vendor_ids_and_unique(manager, df);
     times[1] = std::chrono::steady_clock::now();
     print_passage_counts_by_vendor_id(manager, df, 1);
