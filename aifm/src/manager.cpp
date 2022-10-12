@@ -772,6 +772,10 @@ void FarMemManager::launch_gc_master() {
 
 uint8_t FarMemManager::allocate_ds_id() {
   auto ds_id = available_ds_ids_.front();
+  if (available_ds_ids_.empty()) {
+    std::cerr << "running out of ds_ids!!!" << std::endl;
+    BUG();
+  }
   available_ds_ids_.pop();
   return ds_id;
 }

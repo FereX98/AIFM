@@ -19,18 +19,18 @@ public:
   virtual ~FarMemDevice() {}
   uint64_t get_far_mem_size() const { return far_mem_size_; }
   uint32_t get_prefetch_win_size() const { return prefetch_win_size_; }
-  virtual void read_object(uint8_t ds_id, uint8_t obj_id_len,
+  virtual void read_object(uint32_t ds_id, uint8_t obj_id_len,
                            const uint8_t *obj_id, uint16_t *data_len,
                            uint8_t *data_buf) = 0;
-  virtual void write_object(uint8_t ds_id, uint8_t obj_id_len,
+  virtual void write_object(uint32_t ds_id, uint8_t obj_id_len,
                             const uint8_t *obj_id, uint16_t data_len,
                             const uint8_t *data_buf) = 0;
   virtual bool remove_object(uint64_t ds_id, uint8_t obj_id_len,
                              const uint8_t *obj_id) = 0;
-  virtual void construct(uint8_t ds_type, uint8_t ds_id, uint8_t param_len,
+  virtual void construct(uint8_t ds_type, uint32_t ds_id, uint8_t param_len,
                          uint8_t *params) = 0;
-  virtual void destruct(uint8_t ds_id) = 0;
-  virtual void compute(uint8_t ds_id, uint8_t opcode, uint16_t input_len,
+  virtual void destruct(uint32_t ds_id) = 0;
+  virtual void compute(uint32_t ds_id, uint8_t opcode, uint16_t input_len,
                        const uint8_t *input_buf, uint16_t *output_len,
                        uint8_t *output_buf) = 0;
 };
@@ -43,15 +43,15 @@ private:
 public:
   FakeDevice(uint64_t far_mem_size);
   ~FakeDevice();
-  void read_object(uint8_t ds_id, uint8_t obj_id_len, const uint8_t *obj_id,
+  void read_object(uint32_t ds_id, uint8_t obj_id_len, const uint8_t *obj_id,
                    uint16_t *data_len, uint8_t *data_buf);
-  void write_object(uint8_t ds_id, uint8_t obj_id_len, const uint8_t *obj_id,
+  void write_object(uint32_t ds_id, uint8_t obj_id_len, const uint8_t *obj_id,
                     uint16_t data_len, const uint8_t *data_buf);
   bool remove_object(uint64_t ds_id, uint8_t obj_id_len, const uint8_t *obj_id);
-  void construct(uint8_t ds_type, uint8_t ds_id, uint8_t param_len,
+  void construct(uint8_t ds_type, uint32_t ds_id, uint8_t param_len,
                  uint8_t *params);
-  void destruct(uint8_t ds_id);
-  void compute(uint8_t ds_id, uint8_t opcode, uint16_t input_len,
+  void destruct(uint32_t ds_id);
+  void compute(uint32_t ds_id, uint8_t opcode, uint16_t input_len,
                const uint8_t *input_buf, uint16_t *output_len,
                uint8_t *output_buf);
 };
@@ -63,18 +63,18 @@ private:
   tcpconn_t *remote_master_;
   SharedPool<tcpconn_t *> shared_pool_;
 
-  void _read_object(tcpconn_t *remote_slave, uint8_t ds_id, uint8_t obj_id_len,
+  void _read_object(tcpconn_t *remote_slave, uint32_t ds_id, uint8_t obj_id_len,
                     const uint8_t *obj_id, uint16_t *data_len,
                     uint8_t *data_buf);
-  void _write_object(tcpconn_t *remote_slave, uint8_t ds_id, uint8_t obj_id_len,
+  void _write_object(tcpconn_t *remote_slave, uint32_t ds_id, uint8_t obj_id_len,
                      const uint8_t *obj_id, uint16_t data_len,
                      const uint8_t *data_buf);
   bool _remove_object(tcpconn_t *remote_slave, uint64_t ds_id,
                       uint8_t obj_id_len, const uint8_t *obj_id);
-  void _construct(tcpconn_t *remote_slave, uint8_t ds_type, uint8_t ds_id,
+  void _construct(tcpconn_t *remote_slave, uint8_t ds_type, uint32_t ds_id,
                   uint8_t param_len, uint8_t *params);
-  void _destruct(tcpconn_t *remote_slave, uint8_t ds_id);
-  void _compute(tcpconn_t *remote_slave, uint8_t ds_id, uint8_t opcode,
+  void _destruct(tcpconn_t *remote_slave, uint32_t ds_id);
+  void _compute(tcpconn_t *remote_slave, uint32_t ds_id, uint8_t opcode,
                 uint16_t input_len, const uint8_t *input_buf,
                 uint16_t *output_len, uint8_t *output_buf);
 
@@ -107,15 +107,15 @@ public:
 
   TCPDevice(netaddr raddr, uint32_t num_connections, uint64_t far_mem_size);
   ~TCPDevice();
-  void read_object(uint8_t ds_id, uint8_t obj_id_len, const uint8_t *obj_id,
+  void read_object(uint32_t ds_id, uint8_t obj_id_len, const uint8_t *obj_id,
                    uint16_t *data_len, uint8_t *data_buf);
-  void write_object(uint8_t ds_id, uint8_t obj_id_len, const uint8_t *obj_id,
+  void write_object(uint32_t ds_id, uint8_t obj_id_len, const uint8_t *obj_id,
                     uint16_t data_len, const uint8_t *data_buf);
   bool remove_object(uint64_t ds_id, uint8_t obj_id_len, const uint8_t *obj_id);
-  void construct(uint8_t ds_type, uint8_t ds_id, uint8_t param_len,
+  void construct(uint8_t ds_type, uint32_t ds_id, uint8_t param_len,
                  uint8_t *params);
-  void destruct(uint8_t ds_id);
-  void compute(uint8_t ds_id, uint8_t opcode, uint16_t input_len,
+  void destruct(uint32_t ds_id);
+  void compute(uint32_t ds_id, uint8_t opcode, uint16_t input_len,
                const uint8_t *input_buf, uint16_t *output_len,
                uint8_t *output_buf);
 };

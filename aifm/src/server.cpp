@@ -24,19 +24,19 @@ void Server::register_ds(uint8_t ds_type, ServerDSFactory *factory) {
   registered_server_ds_factorys_[ds_type] = factory;
 }
 
-void Server::construct(uint8_t ds_type, uint8_t ds_id, uint8_t param_len,
+void Server::construct(uint8_t ds_type, uint32_t ds_id, uint8_t param_len,
                        uint8_t *params) {
   auto factory = registered_server_ds_factorys_[ds_type];
   BUG_ON(server_ds_ptrs_[ds_id]);
   server_ds_ptrs_[ds_id].reset(factory->build(param_len, params));
 }
 
-void Server::destruct(uint8_t ds_id) {
+void Server::destruct(uint32_t ds_id) {
   BUG_ON(!server_ds_ptrs_[ds_id]);
   server_ds_ptrs_[ds_id].reset();
 }
 
-void Server::read_object(uint8_t ds_id, uint8_t obj_id_len,
+void Server::read_object(uint32_t ds_id, uint8_t obj_id_len,
                          const uint8_t *obj_id, uint16_t *data_len,
                          uint8_t *data_buf) {
   auto ds_ptr = server_ds_ptrs_[ds_id].get();
@@ -46,7 +46,7 @@ void Server::read_object(uint8_t ds_id, uint8_t obj_id_len,
   ds_ptr->read_object(obj_id_len, obj_id, data_len, data_buf);
 }
 
-void Server::write_object(uint8_t ds_id, uint8_t obj_id_len,
+void Server::write_object(uint32_t ds_id, uint8_t obj_id_len,
                           const uint8_t *obj_id, uint16_t data_len,
                           const uint8_t *data_buf) {
   auto ds_ptr = server_ds_ptrs_[ds_id].get();
@@ -65,14 +65,14 @@ bool Server::remove_object(uint64_t ds_id, uint8_t obj_id_len,
   return ds_ptr->remove_object(obj_id_len, obj_id);
 }
 
-void Server::compute(uint8_t ds_id, uint8_t opcode, uint16_t input_len,
+void Server::compute(uint32_t ds_id, uint8_t opcode, uint16_t input_len,
                      const uint8_t *input_buf, uint16_t *output_len,
                      uint8_t *output_buf) {
   auto ds_ptr = server_ds_ptrs_[ds_id].get();
   return ds_ptr->compute(opcode, input_len, input_buf, output_len, output_buf);
 }
 
-ServerDS *Server::get_server_ds(uint8_t ds_id) {
+ServerDS *Server::get_server_ds(uint32_t ds_id) {
   return server_ds_ptrs_[ds_id].get();
 }
 

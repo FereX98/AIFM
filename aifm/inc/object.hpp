@@ -11,7 +11,7 @@ class Object {
   //
   // Format:
   // |<------------------ header ------------------>|
-  // |ptr_addr(6B)|data_len(2B)|ds_id(1B)|id_len(1B)|data|object_ID|
+  // |ptr_addr(6B)|data_len(2B)|ds_id(4B)|id_len(1B)|data|object_ID|
   //
   //      ptr_addr: points to the corresponding far-mem pointer. During GC,
   //                the collector uses the field to jump from Region to far-mem
@@ -28,12 +28,12 @@ private:
   constexpr static uint32_t kPtrAddrSize = 6;
   constexpr static uint32_t kDataLenPos = 6;
   constexpr static uint32_t kDSIDPos = 8;
-  constexpr static uint32_t kIDLenPos = 9;
+  constexpr static uint32_t kIDLenPos = 12;
   // It stores the address of the object (which is stored in the local region).
   uint64_t addr_;
 
 public:
-  constexpr static uint32_t kDSIDSize = 1;
+  constexpr static uint32_t kDSIDSize = 4;
   constexpr static uint32_t kIDLenSize = 1;
   constexpr static uint32_t kDataLenSize = 2;
   constexpr static uint32_t kHeaderSize =

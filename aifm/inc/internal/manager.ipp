@@ -119,11 +119,15 @@ FORCE_INLINE FarMemManager *FarMemManagerFactory::get() { return ptr_; }
 
 FORCE_INLINE void FarMemManager::register_eval_notifier(uint8_t ds_id,
                                                         EvacNotifier notifier) {
+  // DataFrame should never register evac notifier
+  BUG();
   evac_notifiers_[ds_id] = notifier;
 }
 
 FORCE_INLINE void FarMemManager::register_copy_notifier(uint8_t ds_id,
                                                         CopyNotifier notifier) {
+  // DataFrame should never register copy notifier
+  BUG();
   copy_notifiers_[ds_id] = notifier;
 }
 

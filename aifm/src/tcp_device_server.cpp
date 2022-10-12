@@ -67,7 +67,7 @@ void process_shutdown(tcpconn_t *c) {
 }
 
 // Request:
-// |Opcode = KOpReadObject(1B) | ds_id(1B) | obj_id_len(1B) | obj_id |
+// |Opcode = KOpReadObject(1B) | ds_id(4B) | obj_id_len(1B) | obj_id |
 // Response:
 // |data_len(2B)|data_buf(data_len B)|
 void process_read_object(tcpconn_t *c) {
@@ -76,7 +76,7 @@ void process_read_object(tcpconn_t *c) {
   uint8_t resp[Object::kDataLenSize + Object::kMaxObjectDataSize];
 
   helpers::tcp_read_until(c, req, Object::kDSIDSize + Object::kIDLenSize);
-  auto ds_id = *const_cast<uint8_t *>(&req[0]);
+  auto ds_id = *reinterpret_cast<uint32_t *>(&req[0]);
   auto object_id_len = *const_cast<uint8_t *>(&req[Object::kDSIDSize]);
   auto *object_id = &req[Object::kDSIDSize + Object::kIDLenSize];
   helpers::tcp_read_until(c, object_id, object_id_len);
@@ -89,7 +89,7 @@ void process_read_object(tcpconn_t *c) {
 }
 
 // Request:
-// |Opcode = KOpWriteObject (1B)|ds_id(1B)|obj_id_len(1B)|data_len(2B)|
+// |Opcode = KOpWriteObject (1B)|ds_id(4B)|obj_id_len(1B)|data_len(2B)|
 // |obj_id(obj_id_len B)|data_buf(data_len)|
 // Response:
 // |Ack (1B)|
@@ -100,7 +100,7 @@ void process_write_object(tcpconn_t *c) {
   helpers::tcp_read_until(
       c, req, Object::kDSIDSize + Object::kIDLenSize + Object::kDataLenSize);
 
-  auto ds_id = *const_cast<uint8_t *>(&req[0]);
+  auto ds_id = *reinterpret_cast<uint32_t *>(&req[0]);
   auto object_id_len = *const_cast<uint8_t *>(&req[Object::kDSIDSize]);
   auto data_len = *reinterpret_cast<uint16_t *>(
       &req[Object::kDSIDSize + Object::kIDLenSize]);
@@ -122,7 +122,7 @@ void process_write_object(tcpconn_t *c) {
 }
 
 // Request:
-// |Opcode = kOpRemoveObject (1B)|ds_id(1B)|obj_id_len(1B)|obj_id(obj_id_len B)|
+// |Opcode = kOpRemoveObject (1B)|ds_id(4B)|obj_id_len(1B)|obj_id(obj_id_len B)|
 // Response:
 // |exists (1B)|
 void process_remove_object(tcpconn_t *c) {
@@ -130,7 +130,7 @@ void process_remove_object(tcpconn_t *c) {
       req[Object::kDSIDSize + Object::kIDLenSize + Object::kMaxObjectIDSize];
 
   helpers::tcp_read_until(c, req, Object::kDSIDSize + Object::kIDLenSize);
-  auto ds_id = *const_cast<uint8_t *>(&req[0]);
+  auto ds_id = *reinterpret_cast<uint32_t *>(&req[0]);
   auto obj_id_len = *const_cast<uint8_t *>(&req[Object::kDSIDSize]);
 
   helpers::tcp_read_until(c, &req[Object::kDSIDSize + Object::kIDLenSize],
@@ -144,7 +144,7 @@ void process_remove_object(tcpconn_t *c) {
 }
 
 // Request:
-// |Opcode = kOpConstruct (1B)|ds_type(1B)|ds_id(1B)|
+// |Opcode = kOpConstruct (1B)|ds_type(1B)|ds_id(4B)|
 // |param_len(1B)|params(param_len B)|
 // Response:
 // |Ack (1B)|
@@ -159,7 +159,7 @@ void process_construct(tcpconn_t *c) {
   helpers::tcp_read_until(
       c, req, sizeof(ds_type) + Object::kDSIDSize + sizeof(param_len));
   ds_type = *const_cast<uint8_t *>(&req[0]);
-  ds_id = *const_cast<uint8_t *>(&req[sizeof(ds_type)]);
+  ds_id = *reinterpret_cast<uint32_t *>(&req[sizeof(ds_type)]);
   param_len = *const_cast<uint8_t *>(&req[sizeof(ds_type) + Object::kDSIDSize]);
   helpers::tcp_read_until(
       c, &req[sizeof(ds_type) + Object::kDSIDSize + sizeof(param_len)],
@@ -174,11 +174,11 @@ void process_construct(tcpconn_t *c) {
 }
 
 // Request:
-// |Opcode = kOpDeconstruct (1B)|ds_id(1B)|
+// |Opcode = kOpDeconstruct (1B)|ds_id(4B)|
 // Response:
 // |Ack (1B)|
 void process_destruct(tcpconn_t *c) {
-  uint8_t ds_id;
+  uint32_t ds_id;
 
   helpers::tcp_read_until(c, &ds_id, Object::kDSIDSize);
 
@@ -189,7 +189,7 @@ void process_destruct(tcpconn_t *c) {
 }
 
 // Request:
-// |Opcode = kOpCompute(1B)|ds_id(1B)|opcode(1B)|input_len(2B)|
+// |Opcode = kOpCompute(1B)|ds_id(4B)|opcode(1B)|input_len(2B)|
 // |input_buf(input_len)|
 // Response:
 // |output_len(2B)|output_buf(output_len B)|
@@ -202,7 +202,7 @@ void process_compute(tcpconn_t *c) {
   helpers::tcp_read_until(
       c, req, Object::kDSIDSize + sizeof(opcode) + sizeof(input_len));
 
-  auto ds_id = *reinterpret_cast<uint8_t *>(&req[0]);
+  auto ds_id = *reinterpret_cast<uint32_t *>(&req[0]);
   opcode = *reinterpret_cast<uint8_t *>(&req[Object::kDSIDSize]);
   input_len =
       *reinterpret_cast<uint16_t *>(&req[Object::kDSIDSize + sizeof(opcode)]);

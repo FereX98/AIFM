@@ -148,8 +148,8 @@ public:
   using CopyNotifier = std::function<void(Object dest, Object src)>;
 
   uint32_t num_gc_threads_;
-  EvacNotifier evac_notifiers_[kMaxNumDSIDs];
-  CopyNotifier copy_notifiers_[kMaxNumDSIDs];
+  EvacNotifier evac_notifiers_[kFillerMaxNumDSIDs];
+  CopyNotifier copy_notifiers_[kFillerMaxNumDSIDs];
 
   ~FarMemManager();
   FarMemDevice *get_device() const { return device_ptr_.get(); }

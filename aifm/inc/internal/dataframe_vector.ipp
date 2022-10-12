@@ -738,6 +738,8 @@ DataFrameVector<T>::get_col_unique_values_locally(FarMemManager *manager) {
 template <typename T>
 FORCE_INLINE DataFrameVector<T>
 DataFrameVector<T>::get_col_unique_values_remotely(FarMemManager *manager) {
+  // no compute offloading support
+  BUG();
   flush();
   auto unique_dataframe_vec = DataFrameVector<T>(manager);
   uint16_t input_len;
@@ -791,6 +793,8 @@ FORCE_INLINE DataFrameVector<T> DataFrameVector<T>::copy_data_by_idx_locally(
 template <typename T>
 FORCE_INLINE DataFrameVector<T> DataFrameVector<T>::copy_data_by_idx_remotely(
     FarMemManager *manager, DataFrameVector<unsigned long long> &idx_vec) {
+  // no compute offloading support
+  BUG();
   idx_vec.flush();
   flush();
   auto ret = DataFrameVector<T>(manager);
@@ -848,6 +852,8 @@ template <typename T>
 FORCE_INLINE DataFrameVector<T>
 DataFrameVector<T>::shuffle_data_by_idx_remotely(
     FarMemManager *manager, DataFrameVector<unsigned long long> &idx_vec) {
+  // no compute offloading support
+  BUG();
   idx_vec.flush();
   flush();
   auto ret = DataFrameVector<T>(manager);
@@ -907,6 +913,8 @@ template <typename T>
 FORCE_INLINE void
 DataFrameVector<T>::assign_remotely(const DataFrameVector<T>::Iterator &begin,
                                     const DataFrameVector<T>::Iterator &end) {
+  // no compute offloading support
+  BUG();
   begin.dataframe_vec_->flush();
   auto begin_flat_idx = begin.get_idx();
   auto end_flat_idx = end.get_idx();
@@ -999,6 +1007,8 @@ template <typename U>
 FORCE_INLINE DataFrameVector<T>
 DataFrameVector<T>::aggregate_remotely(FarMemManager *manager, const U &key_vec,
                                        OpCode opcode) {
+  // no compute offloading support
+  BUG();
   const_cast<U *>(&key_vec)->flush();
   assert(size() == key_vec.size());
   auto result = DataFrameVector<T>(manager);
