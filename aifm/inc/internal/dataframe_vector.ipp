@@ -289,8 +289,16 @@ FORCE_INLINE DataFrameVector<T>::FastIterator<Mut>::FastIterator(
       dataframe_vec_(const_cast<DataFrameVector *>(dataframe_vec)) {
   auto [chunk_idx, chunk_offset] = dataframe_vec_->get_chunk_stats(idx);
   chunk_ptr_ = &(dataframe_vec_->chunk_ptrs_[chunk_idx]);
-  update_on_new_chunk<Nt>();
-  data_ptr_ = data_ptr_begin_ + chunk_offset;
+  // For an empty vector, chunk_ptr_ is some random address or 0.
+  // resolving it will cause seg fault. Skip it.
+  // This iterator will not be used if the code properly
+  // jumps out of iterating by comparing iteration variable with size()
+  if (dataframe_vec_->size() > 0) {
+    update_on_new_chunk<Nt>();
+    data_ptr_ = data_ptr_begin_ + chunk_offset;
+  } else {
+    data_ptr_begin_ = data_ptr_end_ = data_ptr_ = nullptr;
+  }
 }
 
 template <typename T>
