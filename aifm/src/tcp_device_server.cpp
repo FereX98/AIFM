@@ -150,7 +150,7 @@ void process_remove_object(tcpconn_t *c) {
 // |Ack (1B)|
 void process_construct(tcpconn_t *c) {
   uint8_t ds_type;
-  uint8_t ds_id;
+  uint32_t ds_id;
   uint8_t param_len;
   uint8_t *params;
   uint8_t req[sizeof(ds_type) + Object::kDSIDSize + sizeof(param_len) +
