@@ -51,7 +51,7 @@ FORCE_INLINE std::optional<Region> FarMemManager::pop_cache_used_region() {
 }
 
 template <typename T>
-FORCE_INLINE UniquePtr<T> FarMemManager::allocate_unique_ptr(uint8_t ds_id) {
+FORCE_INLINE UniquePtr<T> FarMemManager::allocate_unique_ptr(uint32_t ds_id) {
   static_assert(sizeof(T) <= Object::kMaxObjectDataSize);
   auto object_size = Object::kHeaderSize + sizeof(T) + kVanillaPtrObjectIDSize;
   auto local_object_addr = allocate_local_object(false, object_size);
@@ -65,7 +65,7 @@ FORCE_INLINE UniquePtr<T> FarMemManager::allocate_unique_ptr(uint8_t ds_id) {
 }
 
 template <typename T>
-FORCE_INLINE SharedPtr<T> FarMemManager::allocate_shared_ptr(uint8_t ds_id) {
+FORCE_INLINE SharedPtr<T> FarMemManager::allocate_shared_ptr(uint32_t ds_id) {
   static_assert(sizeof(T) <= Object::kMaxObjectDataSize);
   auto object_size = Object::kHeaderSize + sizeof(T) + kVanillaPtrObjectIDSize;
   auto local_object_addr = allocate_local_object(false, object_size);
@@ -131,7 +131,7 @@ FORCE_INLINE void FarMemManager::register_copy_notifier(uint8_t ds_id,
   copy_notifiers_[ds_id] = notifier;
 }
 
-FORCE_INLINE void FarMemManager::read_object(uint8_t ds_id, uint8_t obj_id_len,
+FORCE_INLINE void FarMemManager::read_object(uint32_t ds_id, uint8_t obj_id_len,
                                              const uint8_t *obj_id,
                                              uint16_t *data_len,
                                              uint8_t *data_buf) {
@@ -144,13 +144,13 @@ FORCE_INLINE bool FarMemManager::remove_object(uint64_t ds_id,
   return device_ptr_->remove_object(ds_id, obj_id_len, obj_id);
 }
 
-FORCE_INLINE void FarMemManager::construct(uint8_t ds_type, uint8_t ds_id,
+FORCE_INLINE void FarMemManager::construct(uint8_t ds_type, uint32_t ds_id,
                                            uint32_t param_len,
                                            uint8_t *params) {
   device_ptr_->construct(ds_type, ds_id, param_len, params);
 }
 
-FORCE_INLINE void FarMemManager::destruct(uint8_t ds_id) {
+FORCE_INLINE void FarMemManager::destruct(uint32_t ds_id) {
   free_ds_id(ds_id);
   device_ptr_->destruct(ds_id);
 }

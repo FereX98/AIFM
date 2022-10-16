@@ -101,7 +101,7 @@ private:
   GCParallelWriteBacker parallel_write_backer_;
   std::vector<Region> from_regions_{kMaxNumRegionsPerGCRound};
   int ksched_fd_;
-  std::queue<uint8_t> available_ds_ids_;
+  std::queue<uint32_t> available_ds_ids_;
   static ObjLocker obj_locker_;
 
   friend class FarMemTest;
@@ -139,8 +139,8 @@ private:
   void gc_check();
   void start_prioritizing(Status status);
   void stop_prioritizing();
-  uint8_t allocate_ds_id();
-  void free_ds_id(uint8_t ds_id);
+  uint32_t allocate_ds_id();
+  void free_ds_id(uint32_t ds_id);
 
 public:
   using WriteObjectFn = std::function<void(uint32_t data_len)>;
@@ -155,11 +155,11 @@ public:
   FarMemDevice *get_device() const { return device_ptr_.get(); }
   double get_free_mem_ratio() const;
   bool allocate_generic_unique_ptr_nb(
-      GenericUniquePtr *ptr, uint8_t ds_id, uint16_t item_size,
+      GenericUniquePtr *ptr, uint32_t ds_id, uint16_t item_size,
       std::optional<uint8_t> optional_id_len = {},
       std::optional<const uint8_t *> optional_id = {});
   GenericUniquePtr
-  allocate_generic_unique_ptr(uint8_t ds_id, uint16_t item_size,
+  allocate_generic_unique_ptr(uint32_t ds_id, uint16_t item_size,
                               std::optional<uint8_t> optional_id_len = {},
                               std::optional<const uint8_t *> optional_id = {});
   bool reallocate_generic_unique_ptr_nb(const DerefScope &scope,
@@ -167,9 +167,9 @@ public:
                                         uint16_t new_item_size,
                                         const uint8_t *data_buf);
   template <typename T>
-  UniquePtr<T> allocate_unique_ptr(uint8_t ds_id = kVanillaPtrDSID);
+  UniquePtr<T> allocate_unique_ptr(uint32_t ds_id = kVanillaPtrDSID);
   template <typename T>
-  SharedPtr<T> allocate_shared_ptr(uint8_t ds_id = kVanillaPtrDSID);
+  SharedPtr<T> allocate_shared_ptr(uint32_t ds_id = kVanillaPtrDSID);
   template <typename T, uint64_t... Dims> Array<T, Dims...> allocate_array();
   template <typename T, uint64_t... Dims>
   Array<T, Dims...> *allocate_array_heap();
@@ -208,12 +208,12 @@ public:
   template <typename T> Stack<T> allocate_stack(const DerefScope &scope);
   void register_eval_notifier(uint8_t ds_id, EvacNotifier notifier);
   void register_copy_notifier(uint8_t ds_id, CopyNotifier notifier);
-  void read_object(uint8_t ds_id, uint8_t obj_id_len, const uint8_t *obj_id,
+  void read_object(uint32_t ds_id, uint8_t obj_id_len, const uint8_t *obj_id,
                    uint16_t *data_len, uint8_t *data_buf);
   bool remove_object(uint64_t ds_id, uint8_t obj_id_len, const uint8_t *obj_id);
-  void construct(uint8_t ds_type, uint8_t ds_id, uint32_t param_len,
+  void construct(uint8_t ds_type, uint32_t ds_id, uint32_t param_len,
                  uint8_t *params);
-  void destruct(uint8_t ds_id);
+  void destruct(uint32_t ds_id);
   void mutator_wait_for_gc_cache();
   static void lock_object(uint8_t obj_id_len, const uint8_t *obj_id);
   static void unlock_object(uint8_t obj_id_len, const uint8_t *obj_id);

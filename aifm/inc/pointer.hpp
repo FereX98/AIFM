@@ -6,8 +6,8 @@
 namespace far_memory {
 
 // Format:
-//  I) |XXXXXXX !H(1b)|  0   S(1b)!D(1b)00000|E(1b)|  Object Data Addr(47b)  |
-// II) |   DS_ID(8b)  |!P(1b)S(1b)| Object Size(16b) |      ObjectID(38b)    |
+//  I) |XXXXXXX !H(1b)      |  0   S(1b)!D(1b)00000|E(1b)|  Object Data Addr(47b)  | DS_ID(32b) | filler 32b to make it word-aligned |
+// II) |  unused DS_ID(8b)  |!P(1b)S(1b)| Object Size(16b) |      ObjectID(38b)    | DS_ID(32b) | filler 32b to make it word-aligned |
 //
 //                  D: dirty bit.
 //                  P: present.
@@ -20,10 +20,12 @@ namespace far_memory {
 //              DS_ID: data structure ID.
 //        Object Size: the size of the pointed object.
 //          Object ID: universal object ID (used when swapping in).
+// For expanded ds id, we expand the pointer metadata by 4 bytes to store the ds id.
+// The original 8b ds id is unused.
 
 class FarMemPtrMeta {
 private:
-  constexpr static uint32_t kSize = 8;
+  constexpr static uint32_t kSize = 16;
   constexpr static uint32_t kEvacuationPos = 2;
   constexpr static uint32_t kObjectIDBitPos = 26;
   constexpr static uint32_t kObjectIDBitSize = 38;
@@ -39,7 +41,7 @@ private:
   constexpr static uint32_t kHotPos = 0;
   constexpr static uint32_t kPresentPos = 1;
   constexpr static uint32_t kHotThresh = 2;
-  constexpr static uint32_t kDSIDPos = 0;
+  constexpr static uint32_t kDSIDPos = 8;
   constexpr static uint32_t kSharedBitPos = 9;
 
   uint8_t metadata_[kSize];
@@ -77,14 +79,15 @@ public:
   uint64_t get_object_addr() const;
   uint16_t get_object_size() const;
   Object object();
-  uint8_t get_ds_id() const;
+  uint32_t get_ds_id() const;
+  void set_ds_id_in_ptr(uint32_t ds_id);
   bool is_null() const;
   void nullify();
   uint64_t to_uint64_t() const;
   void from_uint64_t(uint64_t val);
   void mutator_copy(uint64_t new_local_object_addr);
   void gc_copy(uint64_t new_local_object_addr);
-  void gc_wb(uint8_t ds_id, uint16_t object_size, uint64_t obj_id);
+  void gc_wb(uint32_t ds_id, uint16_t object_size, uint64_t obj_id);
   static FarMemPtrMeta *from_object(const Object &object);
 };
 

@@ -49,9 +49,9 @@ public:
   Object(uint64_t addr);
   // Initialize the object at address addr. Field ptr_addr is written by
   // far-mem pointer.
-  Object(uint64_t addr, uint8_t ds_id, uint16_t data_len, uint8_t id_len,
+  Object(uint64_t addr, uint32_t ds_id, uint16_t data_len, uint8_t id_len,
          const uint8_t *id);
-  void init(uint8_t ds_id, uint16_t data_len, uint8_t id_len,
+  void init(uint32_t ds_id, uint16_t data_len, uint8_t id_len,
             const uint8_t *id);
   uint64_t get_addr() const;
   uint16_t get_data_len() const;
@@ -60,8 +60,8 @@ public:
   const uint8_t *get_obj_id() const;
   uint64_t get_ptr_addr() const;
   uint64_t get_data_addr() const;
-  void set_ds_id(uint8_t ds_id);
-  uint8_t get_ds_id() const;
+  void set_ds_id(uint32_t ds_id);
+  uint32_t get_ds_id() const;
   void set_data_len(uint16_t data_len);
   void set_obj_id(const uint8_t *id, uint8_t id_len);
   void set_obj_id_len(uint8_t id_len);

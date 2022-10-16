@@ -70,7 +70,7 @@ private:
   uint32_t chunk_size_;
   uint32_t chunk_num_entries_;
   FarMemDevice *device_;
-  uint8_t ds_id_;
+  uint32_t ds_id_;
   uint64_t size_ = 0;
   uint64_t remote_vec_capacity_ = 0;
   ReaderWriterLock lock_;
@@ -88,7 +88,7 @@ private:
 
 public:
   GenericDataFrameVector(const uint32_t chunk_size, uint32_t chunk_num_entries,
-                         uint8_t ds_id, uint8_t dt_id);
+                         uint32_t ds_id, uint8_t dt_id);
   NOT_COPYABLE(GenericDataFrameVector);
   GenericDataFrameVector(GenericDataFrameVector &&other);
   GenericDataFrameVector &operator=(GenericDataFrameVector &&other);
@@ -107,12 +107,12 @@ private:
   using Pattern_t = int64_t;
 
   // Be reminded that this parameter on memory server also needed to be changed and recompiled
-  constexpr static uint32_t kPreferredChunkSize = 4096;
+  constexpr static uint32_t kPreferredChunkSize = 512;
   constexpr static uint32_t kRealChunkNumEntries =
       std::max(static_cast<uint32_t>(1),
                helpers::round_up_power_of_two(kPreferredChunkSize / sizeof(T)));
   constexpr static uint32_t kRealChunkSize = sizeof(T) * kRealChunkNumEntries;
-  constexpr static uint32_t kSizePerExpansion = 4 << 20; // 4 MiB.
+  constexpr static uint32_t kSizePerExpansion = 512;
   constexpr static uint32_t kNumEntriesPerExpansion =
       (kSizePerExpansion - 1) / sizeof(T) + 1;
   constexpr static uint64_t kNumElementsPerScope = 1024;

@@ -19,6 +19,8 @@ GenericConcurrentHopscotchLocal::GenericConcurrentHopscotchLocal(
     : kHashMask_((1 << local_num_entries_shift) - 1),
       kNumEntries_((1 << local_num_entries_shift) + kNeighborhood),
       ds_id_(ds_id) {
+  // not modified for expanded ds_id
+  BUG();
   // Check overflow.
   BUG_ON(((kHashMask_ + 1) >> local_num_entries_shift) != 1);
 

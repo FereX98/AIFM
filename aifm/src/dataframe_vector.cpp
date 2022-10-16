@@ -5,7 +5,7 @@
 namespace far_memory {
 GenericDataFrameVector::GenericDataFrameVector(const uint32_t chunk_size,
                                                const uint32_t chunk_num_entries,
-                                               uint8_t ds_id, uint8_t dt_id)
+                                               uint32_t ds_id, uint8_t dt_id)
     : chunk_size_(chunk_size), chunk_num_entries_(chunk_num_entries),
       device_(FarMemManagerFactory::get()->get_device()), ds_id_(ds_id) {
   FarMemManagerFactory::get()->construct(kDataFrameVectorDSType, ds_id,

@@ -10,13 +10,13 @@ FORCE_INLINE Object::Object() {}
 
 FORCE_INLINE Object::Object(uint64_t addr) : addr_(addr) {}
 
-FORCE_INLINE Object::Object(uint64_t addr, uint8_t ds_id, uint16_t data_len,
+FORCE_INLINE Object::Object(uint64_t addr, uint32_t ds_id, uint16_t data_len,
                             uint8_t id_len, const uint8_t *id)
     : Object(addr) {
   init(ds_id, data_len, id_len, id);
 }
 
-FORCE_INLINE void Object::init(uint8_t ds_id, uint16_t data_len, uint8_t id_len,
+FORCE_INLINE void Object::init(uint32_t ds_id, uint16_t data_len, uint8_t id_len,
                                const uint8_t *id) {
   set_ds_id(ds_id);
   set_data_len(data_len);
@@ -24,13 +24,13 @@ FORCE_INLINE void Object::init(uint8_t ds_id, uint16_t data_len, uint8_t id_len,
   set_obj_id(id, id_len);
 }
 
-FORCE_INLINE void Object::set_ds_id(uint8_t ds_id) {
-  auto *ptr = reinterpret_cast<uint8_t *>(addr_ + kDSIDPos);
+FORCE_INLINE void Object::set_ds_id(uint32_t ds_id) {
+  auto *ptr = reinterpret_cast<uint32_t *>(addr_ + kDSIDPos);
   *ptr = ds_id;
 }
 
-FORCE_INLINE uint8_t Object::get_ds_id() const {
-  auto *ptr = reinterpret_cast<uint8_t *>(addr_ + kDSIDPos);
+FORCE_INLINE uint32_t Object::get_ds_id() const {
+  auto *ptr = reinterpret_cast<uint32_t *>(addr_ + kDSIDPos);
   return *ptr;
 }
 

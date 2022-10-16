@@ -8,7 +8,7 @@
 namespace far_memory {
 
 void FarMemPtrMeta::set_present(uint64_t object_addr) {
-  static_assert(kSize == sizeof(uint64_t));
+  static_assert(kSize == 2 * sizeof(uint64_t));
   auto obj = Object(object_addr);
   obj.set_ptr_addr(reinterpret_cast<uint64_t>(this));
   wmb();
@@ -20,6 +20,7 @@ void FarMemPtrMeta::set_present(uint64_t object_addr) {
 }
 
 void FarMemPtrMeta::mutator_copy(uint64_t new_local_object_addr) {
+  assert(is_present());
   constexpr auto obj_data_addr_mask = (1ULL << kObjectDataAddrBitPos) - 1;
   // Clear the evacuation bit.
   constexpr auto evacuation_mask = (~(1ULL << (8 * kEvacuationPos)));
@@ -33,6 +34,7 @@ void FarMemPtrMeta::mutator_copy(uint64_t new_local_object_addr) {
 }
 
 void FarMemPtrMeta::gc_copy(uint64_t new_local_object_addr) {
+  assert(is_present());
   uint64_t old_metadata = to_uint64_t();
   assert((old_metadata & kPresentClear) == 0);
   auto new_local_object_data_addr = new_local_object_addr + Object::kHeaderSize;
@@ -43,15 +45,17 @@ void FarMemPtrMeta::gc_copy(uint64_t new_local_object_addr) {
   from_uint64_t(new_metadata);
 }
 
-void FarMemPtrMeta::gc_wb(uint8_t ds_id, uint16_t object_size,
+void FarMemPtrMeta::gc_wb(uint32_t ds_id, uint16_t object_size,
                           uint64_t obj_id) {
   assert(obj_id < (1ULL << kObjectIDBitSize));
+  uint8_t filler_ds_id = 0;
   auto new_metadata =
       (obj_id << kObjectIDBitPos) |
       (static_cast<uint64_t>(object_size) << kObjectSizeBitPos) |
-      kPresentClear | ds_id;
+      kPresentClear | filler_ds_id;
   new_metadata |= (static_cast<uint64_t>(is_shared()) << kSharedBitPos);
   from_uint64_t(new_metadata);
+  set_ds_id_in_ptr(ds_id);
 }
 
 void GenericFarMemPtr::swap_in(bool nt) {
@@ -86,7 +90,9 @@ bool GenericFarMemPtr::mutator_migrate_object() {
     return false;
   }
   auto new_local_object_addr = *optional_new_local_object_addr;
-  if (auto copy_notifier = manager->copy_notifiers_[object.get_ds_id()]) {
+  //if (auto copy_notifier = manager->copy_notifiers_[object.get_ds_id()]) {
+  if (auto copy_notifier = manager->copy_notifiers_[0]) {
+    BUG();
     memcpy(reinterpret_cast<void *>(new_local_object_addr),
            reinterpret_cast<void *>(object.get_addr()), Object::kHeaderSize);
     auto dest_object = Object(new_local_object_addr);

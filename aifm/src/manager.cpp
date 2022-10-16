@@ -66,14 +66,9 @@ FarMemManager::FarMemManager(uint64_t cache_size, uint64_t far_mem_size,
   }
   memset(evac_notifiers_, 0, sizeof(evac_notifiers_));
 
-  for (uint8_t ds_id =
-           std::numeric_limits<decltype(available_ds_ids_)::value_type>::min();
-       ds_id <
-       std::numeric_limits<decltype(available_ds_ids_)::value_type>::max();
-       ds_id++) {
-    if (ds_id != kVanillaPtrDSID) {
-      available_ds_ids_.push(ds_id);
-    }
+  BUG_ON(kVanillaPtrDSID != 0);
+  for (uint32_t ds_id = 1; ds_id < kMaxNumDSIDs; ds_id++) {
+    available_ds_ids_.push(ds_id);
   }
 }
 
@@ -84,7 +79,7 @@ FarMemManager::~FarMemManager() {
 }
 
 bool FarMemManager::allocate_generic_unique_ptr_nb(
-    GenericUniquePtr *ptr, uint8_t ds_id, uint16_t item_size,
+    GenericUniquePtr *ptr, uint32_t ds_id, uint16_t item_size,
     std::optional<uint8_t> optional_id_len,
     std::optional<const uint8_t *> optional_id) {
   assert(item_size <= Object::kMaxObjectDataSize);
@@ -112,7 +107,7 @@ bool FarMemManager::allocate_generic_unique_ptr_nb(
 }
 
 GenericUniquePtr FarMemManager::allocate_generic_unique_ptr(
-    uint8_t ds_id, uint16_t item_size, std::optional<uint8_t> optional_id_len,
+    uint32_t ds_id, uint16_t item_size, std::optional<uint8_t> optional_id_len,
     std::optional<const uint8_t *> optional_id) {
   assert(item_size <= Object::kMaxObjectDataSize);
   auto object_size =
@@ -322,7 +317,9 @@ void FarMemManager::swap_out(GenericFarMemPtr *ptr, Object obj) {
     auto optional_local_object_addr = allocate_local_object_nb(false, obj_size);
     if (likely(optional_local_object_addr)) {
       auto new_local_object_addr = *optional_local_object_addr;
-      if (auto copy_notifier = copy_notifiers_[obj.get_ds_id()]) {
+      //if (auto copy_notifier = copy_notifiers_[obj.get_ds_id()]) {
+      if (auto copy_notifier = copy_notifiers_[0]) {
+        BUG();
         memcpy(reinterpret_cast<void *>(new_local_object_addr),
                reinterpret_cast<void *>(obj.get_addr()), Object::kHeaderSize);
         auto dest_obj = Object(new_local_object_addr);
@@ -357,7 +354,9 @@ void FarMemManager::swap_out(GenericFarMemPtr *ptr, Object obj) {
     }
   };
 
-  if (auto evac_notifier = evac_notifiers_[ds_id]) {
+  //if (auto evac_notifier = evac_notifiers_[ds_id]) {
+  if (auto evac_notifier = evac_notifiers_[0]) {
+    BUG();
     if (evac_notifier(obj, write_object_fn)) { // Ptr removed.
       return;
     }
@@ -439,7 +438,7 @@ void GCParallelMarker::slave_fn(uint32_t tid) {
             }
           }
         }
-        cur += helpers::align_to(obj.size(), sizeof(FarMemPtrMeta));
+        cur += helpers::align_to(obj.size(), sizeof(uint64_t));
       }
     }
   }
@@ -503,7 +502,7 @@ void GCParallelWriteBacker::slave_fn(uint32_t tid) {
             manager->swap_out(ptr, obj);
           }
         }
-        cur += helpers::align_to(obj.size(), sizeof(FarMemPtrMeta));
+        cur += helpers::align_to(obj.size(), sizeof(uint64_t));
       }
     }
   }
@@ -770,7 +769,7 @@ void FarMemManager::launch_gc_master() {
   }
 }
 
-uint8_t FarMemManager::allocate_ds_id() {
+uint32_t FarMemManager::allocate_ds_id() {
   auto ds_id = available_ds_ids_.front();
   if (available_ds_ids_.empty()) {
     std::cerr << "running out of ds_ids!!!" << std::endl;
@@ -780,7 +779,7 @@ uint8_t FarMemManager::allocate_ds_id() {
   return ds_id;
 }
 
-void FarMemManager::free_ds_id(uint8_t ds_id) { available_ds_ids_.push(ds_id); }
+void FarMemManager::free_ds_id(uint32_t ds_id) { available_ds_ids_.push(ds_id); }
 
 bool FarMemManager::reallocate_generic_unique_ptr_nb(const DerefScope &scope,
                                                      GenericUniquePtr *ptr,

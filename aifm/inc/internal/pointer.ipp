@@ -10,20 +10,22 @@ namespace far_memory {
 FORCE_INLINE FarMemPtrMeta::FarMemPtrMeta() {
   // GC design assumes the pointer is always aligned so that R/W operations
   // will be atomic.
-  assert(reinterpret_cast<uint64_t>(this) % sizeof(FarMemPtrMeta) == 0);
+  assert(reinterpret_cast<uint64_t>(this) % sizeof(uint64_t) == 0);
   nullify();
 }
 
 FORCE_INLINE FarMemPtrMeta::FarMemPtrMeta(const FarMemPtrMeta &other) {
-  assert(reinterpret_cast<uint64_t>(this) % sizeof(FarMemPtrMeta) == 0);
-  static_assert(kSize == sizeof(uint64_t));
+  assert(reinterpret_cast<uint64_t>(this) % sizeof(uint64_t) == 0);
+  static_assert(kSize == 2 * sizeof(uint64_t));
   *reinterpret_cast<uint64_t *>(metadata_) =
       *reinterpret_cast<const uint64_t *>(other.metadata_);
+  *reinterpret_cast<uint64_t *>(&metadata_[8]) =
+      *reinterpret_cast<const uint64_t *>(&((other.metadata_)[8]));
 }
 
 FORCE_INLINE
 FarMemPtrMeta::FarMemPtrMeta(bool shared, uint64_t object_addr) {
-  assert(reinterpret_cast<uint64_t>(this) % sizeof(FarMemPtrMeta) == 0);
+  assert(reinterpret_cast<uint64_t>(this) % sizeof(uint64_t) == 0);
   memset(this, 0, sizeof(*this));
   init(shared, object_addr);
 }
@@ -46,7 +48,16 @@ FORCE_INLINE bool FarMemPtrMeta::is_null() const {
   return (to_uint64_t() & kNullMask) == kNull;
 }
 
-FORCE_INLINE void FarMemPtrMeta::nullify() { from_uint64_t(kNull); }
+FORCE_INLINE void FarMemPtrMeta::set_ds_id_in_ptr(uint32_t ds_id) {
+  ACCESS_ONCE(*reinterpret_cast<uint32_t *>(&metadata_[8])) = ds_id;
+}
+
+FORCE_INLINE void FarMemPtrMeta::nullify() {
+  from_uint64_t(kNull); 
+  // We do not have to set ds id word for correctness,
+  // but set it which may be easier for us to debug.
+  set_ds_id_in_ptr(0);
+}
 
 FORCE_INLINE uint64_t FarMemPtrMeta::get_object_data_addr() const {
   return to_uint64_t() >> kObjectDataAddrBitPos;
@@ -66,6 +77,8 @@ FORCE_INLINE Object FarMemPtrMeta::object() {
 }
 
 FORCE_INLINE FarMemPtrMeta *FarMemPtrMeta::from_object(const Object &object) {
+  // seems never called
+  BUG();
   return reinterpret_cast<FarMemPtrMeta *>(object.get_ptr_addr());
 }
 
@@ -154,16 +167,21 @@ FORCE_INLINE void GenericFarMemPtr::nullify() { meta_.nullify(); }
 FORCE_INLINE bool GenericFarMemPtr::is_null() const { return meta_.is_null(); }
 
 FORCE_INLINE bool FarMemPtrMeta::operator==(const FarMemPtrMeta &other) const {
-  return to_uint64_t() == other.to_uint64_t();
+  if (to_uint64_t() == other.to_uint64_t()) {
+    // At least for dataframe, if the original 8 bytes are the same, the extended ds id should also be the same.
+    assert(ACCESS_ONCE(*reinterpret_cast<const uint64_t *>(&metadata_[8])) == ACCESS_ONCE(*reinterpret_cast<const uint64_t *>(&(other.metadata_)[8])));
+    return true;
+  }
+  return false;
 }
 
 FORCE_INLINE bool FarMemPtrMeta::operator!=(const FarMemPtrMeta &other) const {
   return !(operator==(other));
 }
 
-FORCE_INLINE uint8_t FarMemPtrMeta::get_ds_id() const {
+FORCE_INLINE uint32_t FarMemPtrMeta::get_ds_id() const {
   assert(!is_present());
-  return metadata_[kDSIDPos];
+  return *reinterpret_cast<uint32_t *>(const_cast<uint8_t *>(&metadata_[8]));
 }
 
 template <bool Mut, bool Nt, bool Shared>
@@ -258,6 +276,8 @@ FORCE_INLINE GenericUniquePtr::GenericUniquePtr(GenericUniquePtr &&other) {
 
 FORCE_INLINE GenericUniquePtr &GenericUniquePtr::
 operator=(GenericUniquePtr &&other) {
+  // guess this is called by the std::vector resize operation,
+  // to move pointers to new location
   move(other, FarMemPtrMeta::kNull);
   return *this;
 }
@@ -367,19 +387,24 @@ FORCE_INLINE GenericSharedPtr::~GenericSharedPtr() {
   }
 }
 
+// No shared pointers for DataFrame
 FORCE_INLINE GenericSharedPtr::GenericSharedPtr(uint64_t object_addr)
-    : GenericFarMemPtr(/* shared = */ true, object_addr), next_ptr_(this) {}
+    : GenericFarMemPtr(/* shared = */ true, object_addr), next_ptr_(this) { BUG(); }
 
 FORCE_INLINE GenericSharedPtr::GenericSharedPtr(const GenericSharedPtr &other) {
+  BUG();
   *this = other;
 }
 
 FORCE_INLINE GenericSharedPtr::GenericSharedPtr(GenericSharedPtr &&other) {
+  BUG();
   *this = std::move(other);
 }
 
 FORCE_INLINE GenericSharedPtr &GenericSharedPtr::
 operator=(GenericSharedPtr &&other) {
+  // No shared pointers for DataFrame
+  BUG();
   move(other, FarMemPtrMeta::kNull);
   return *this;
 }
@@ -402,13 +427,13 @@ template <bool Nt>
 FORCE_INLINE void *GenericSharedPtr::deref_mut(const DerefScope &scope) {
   return _deref</* Mut = */ true, Nt>();
 }
-
+// No shared pointers for DataFrame
 template <typename T>
 FORCE_INLINE SharedPtr<T>::SharedPtr(uint64_t object_addr)
-    : GenericSharedPtr(object_addr) {}
+    : GenericSharedPtr(object_addr) { BUG(); }
 
 template <typename T>
-FORCE_INLINE SharedPtr<T>::SharedPtr() : GenericSharedPtr() {}
+FORCE_INLINE SharedPtr<T>::SharedPtr() : GenericSharedPtr() { BUG(); }
 
 template <typename T> FORCE_INLINE SharedPtr<T>::~SharedPtr() {
   if (!meta().is_null()) {

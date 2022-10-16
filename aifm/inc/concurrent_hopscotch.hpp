@@ -25,7 +25,7 @@ private:
 
     BucketEntry();
   };
-  static_assert(sizeof(BucketEntry) == 24);
+  static_assert(sizeof(BucketEntry) == 32);
 
 #pragma pack(push, 1)
   struct EvacNotifierMeta {

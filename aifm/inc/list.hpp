@@ -64,7 +64,7 @@ private:
   };
 #pragma pack(pop)
   // Far-mem pointer should never cross the cacheline boundary.
-  static_assert(sizeof(LocalNode) == 32);
+  static_assert(sizeof(LocalNode) == 40);
 
   template <bool Reverse> class GenericIteratorImpl {
   private:
