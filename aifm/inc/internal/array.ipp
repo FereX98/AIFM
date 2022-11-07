@@ -115,6 +115,15 @@ FORCE_INLINE T Array<T, Dims...>::read_safe(Indices... indices) {
 
 template <typename T, uint64_t... Dims>
 template <bool Nt, typename... Indices>
+FORCE_INLINE T* Array<T, Dims...>::at_mut_ptr(const DerefScope &scope,
+                                          Indices... indices) noexcept {
+  auto idx = get_flat_idx(indices...);
+  auto ptr = reinterpret_cast<UniquePtr<T> *>(GenericArray::at(Nt, idx));
+  return (ptr->template deref_mut<Nt>(scope));
+}
+
+template <typename T, uint64_t... Dims>
+template <bool Nt, typename... Indices>
 FORCE_INLINE T &Array<T, Dims...>::at_mut(const DerefScope &scope,
                                           Indices... indices) noexcept {
   auto idx = get_flat_idx(indices...);

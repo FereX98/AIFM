@@ -6,6 +6,7 @@ extern "C" {
 #include "device.hpp"
 #include "object.hpp"
 #include "stats.hpp"
+#include "profiler.hpp"
 
 #include <cstring>
 
@@ -60,6 +61,7 @@ TCPDevice::TCPDevice(netaddr raddr, uint32_t num_connections,
                      uint64_t far_mem_size)
     : FarMemDevice(far_mem_size, kPrefetchWinSize),
       shared_pool_(num_connections) {
+  reset_profilers();
   // Initialize the master connection.
   netaddr laddr = {.ip = MAKE_IP_ADDR(0, 0, 0, 0), .port = 0};
   BUG_ON(tcp_dial(laddr, raddr, &remote_master_) != 0);
@@ -86,6 +88,7 @@ TCPDevice::TCPDevice(netaddr raddr, uint32_t num_connections,
 // Response:
 //     |Ack (1B)|
 TCPDevice::~TCPDevice() {
+  report_stats();
   destruct(kVanillaPtrDSID);
 
   helpers::tcp_write_until(remote_master_, &kOpShutdown, kOpcodeSize);

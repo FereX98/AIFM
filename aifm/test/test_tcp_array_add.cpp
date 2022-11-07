@@ -6,6 +6,7 @@ extern "C" {
 #include "device.hpp"
 #include "helpers.hpp"
 #include "manager.hpp"
+#include "profiler.hpp"
 
 #include <cstdint>
 #include <cstring>
@@ -17,8 +18,8 @@ extern "C" {
 #include <cstdio>
 
 #define RUN_THE_TEST
-#define RUN_AIFM
-//#define RUN_UNMODIFIED
+//#define RUN_AIFM
+#define RUN_UNMODIFIED
 
 #ifdef RUN_AIFM
 //#define DISABLE_PREFETCH
@@ -32,7 +33,7 @@ constexpr static uint64_t kCacheSize = (8ULL << 30);
 constexpr static uint64_t kFarMemSize = (8ULL << 30);
 constexpr static uint32_t kNumGCThreads = 12;
 constexpr static uint32_t kNumEntries =
-    (8ULL << 20); // So the array size is larger than the local cache size.
+    (16ULL << 20); // So the array size is larger than the local cache size.
 //      (24ULL << 20); // So the array size is larger than the local cache size.
 constexpr static uint32_t kNumConnections = 300;
 
@@ -47,6 +48,16 @@ void copy_array(Array<T, N> *array, T *raw_array) {
   for (uint64_t i = 0; i < N; i++) {
     DerefScope scope;
     (*array).at_mut(scope, i) = raw_array[i];
+  }
+}
+
+// only perform the dereference operation, do not load and store values
+// used to evalucate the overhead of fast path
+template <uint64_t N, typename T>
+void copy_array_deref_only(Array<T, N> *array, T *raw_array) {
+  DerefScope scope;
+  for (uint64_t i = 0; i < N; i++) {
+    (*array).at_mut_ptr(scope, i);
   }
 }
 
@@ -89,8 +100,9 @@ void do_work(FarMemManager *manager) {
   uint64_t** array_A = (uint64_t**)malloc(kNumEntries * sizeof(uint64_t));
   uint64_t** array_B = (uint64_t**)malloc(kNumEntries * sizeof(uint64_t));
   uint64_t** array_C = (uint64_t**)malloc(kNumEntries * sizeof(uint64_t));
+  uint64_t* buffer = (uint64_t*)malloc(kNumEntries * sizeof(uint64_t));
   for (uint64_t i = 0; i < kNumEntries; ++i) {
-    array_A[i] = (uint64_t*)malloc(sizeof(uint64_t));
+    array_A[i] = &buffer[i];
     array_B[i] = (uint64_t*)malloc(sizeof(uint64_t));
     array_C[i] = (uint64_t*)malloc(sizeof(uint64_t));
   }
@@ -102,9 +114,21 @@ void do_work(FarMemManager *manager) {
 
   #ifdef RUN_UNMODIFIED
   printf("start copying\n");
+
+  for (uint64_t i = 0; i < kNumEntries; i++) {
+    *array_A[i] = raw_array_B[i];
+  }
+  cout << "rehearsal" << *(array_A[rand() % kNumEntries]) << endl;
+
+  uint64_t start_cycles = get_cycles_start();
   for (uint64_t i = 0; i < kNumEntries; i++) {
     *array_A[i] = raw_array_A[i];
   }
+  uint64_t end_cycles = get_cycles_end();
+  cout << *(array_A[rand() % kNumEntries]) << endl;
+  cout << "copy array A: " << end_cycles - start_cycles << endl;
+  cout << "Passed" << endl;
+  return;
   for (uint64_t i = 0; i < kNumEntries; i++) {
     *array_B[i] = raw_array_B[i];
   }
@@ -133,7 +157,19 @@ void do_work(FarMemManager *manager) {
   #endif // RUN_UNMODIFIED
 
   #ifdef RUN_AIFM
-  copy_array(&array_A, raw_array_A);
+
+  copy_array(&array_A, raw_array_B);
+  DerefScope scope;
+  cout << "rehearsal" << array_A.at(scope, rand() % kNumEntries) << endl;
+
+  uint64_t start_cycles = get_cycles_start();
+  copy_array_deref_only(&array_A, raw_array_A);
+  uint64_t end_cycles = get_cycles_end();
+
+  cout << array_A.at(scope, rand() % kNumEntries) << endl;
+  cout << "copy array A: " << end_cycles - start_cycles << endl;
+  cout << "Passed" << endl;
+  return;
   copy_array(&array_B, raw_array_B);
   add_array(&array_C, &array_A, &array_B);
 

@@ -2,6 +2,7 @@
 
 #include "helpers.hpp"
 #include "region.hpp"
+#include "profiler.hpp"
 
 #include <type_traits>
 
@@ -168,6 +169,11 @@ FORCE_INLINE uint8_t FarMemPtrMeta::get_ds_id() const {
 
 template <bool Mut, bool Nt, bool Shared>
 FORCE_INLINE void *GenericFarMemPtr::_deref() {
+  //static uint64_t local_counter = 0;
+  //uint64_t cycles = 0;
+  //if(local_counter < 1000000) {
+    //cycles = get_cycles_start();
+  //}
 retry:
   // 1) movq.
   auto metadata = meta().to_uint64_t();
@@ -187,14 +193,19 @@ retry:
           return nullptr;
         }
         swap_in(Nt);
+        record_counter(BARRIER_SWAP_IN);
         // Just swapped in, need to update metadata (for the obj data addr).
         metadata = meta().to_uint64_t();
       } else {
+        uint64_t cycles_migration = get_cycles_start();
         if (!mutator_migrate_object()) {
           // GC or another thread wins the race. They may still need a while to
           // finish migrating the object. Yielding itself rather than busy
           // retrying now.
           thread_yield();
+        } else {
+          cycles_migration = get_cycles_end() - cycles_migration;
+          record_overhead(BARRIER_MIGRATION, cycles_migration);
         }
       }
       goto retry;
@@ -212,9 +223,20 @@ retry:
     meta().metadata_[FarMemPtrMeta::kHotPos]--;
   }
 
+  record_counter(FASTPATH);
+
   // 4) shrq.
   return reinterpret_cast<void *>(metadata >>
                                   FarMemPtrMeta::kObjectDataAddrBitPos);
+
+  //if(local_counter < 1000000) {
+    //cycles = get_cycles_end() - cycles;
+    //record_overhead(FASTPATH, cycles);
+    //if (++local_counter == 1000000) {
+  //    report_stats();
+  //  }
+  //}
+  //return return_value;
 }
 
 template <bool Shared>

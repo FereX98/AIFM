@@ -90,6 +90,8 @@ public:
   template <bool Nt = false, typename... Indices>
   T read_safe(Indices... indices);
   template <bool Nt = false, typename... Indices>
+  T* at_mut_ptr(const DerefScope &scope, Indices... indices) noexcept;
+  template <bool Nt = false, typename... Indices>
   T &at_mut(const DerefScope &scope, Indices... indices) noexcept;
   template <bool Nt = false, typename... Indices>
   T &at_mut_safe(const DerefScope &scope, Indices... indices);
