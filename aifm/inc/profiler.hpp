@@ -50,6 +50,8 @@ enum overhead_profiler_type {
 	SWAP_IN_PREP,
 	SWAP_IN_READ,
 	SWAP_IN_INIT,
+	SERVER_DF_VECTOR_READ,
+	SERVER_PTR_READ,
     NUM_OVERHEAD_TYPES
 };
 
@@ -78,5 +80,13 @@ static inline void record_counter(enum overhead_profiler_type type)
 static inline void report_stats(void) {
     for (int i = 0; i < NUM_OVERHEAD_TYPES; i++) {
         std::printf("Profiler %d: %lu cycles, %lu count\n", i, profilers[i].accumulated_cycles.load(), profilers[i].accumulated_count.load());
+    }
+}
+
+static inline void report_on_count(enum overhead_profiler_type type, uint64_t times)
+{
+    if (profilers[type].accumulated_count % times == 0) {
+        report_stats();
+        std::fflush(stdout);
     }
 }

@@ -25,6 +25,7 @@ void ServerDataFrameVector<T>::read_object(uint8_t obj_id_len,
                                            const uint8_t *obj_id,
                                            uint16_t *data_len,
                                            uint8_t *data_buf) {
+  uint64_t cycles = get_cycles_start();
   auto reader_lock = lock_.get_reader_lock();
   uint64_t index;
   assert(obj_id_len == sizeof(index));
@@ -35,6 +36,9 @@ void ServerDataFrameVector<T>::read_object(uint8_t obj_id_len,
       data_buf, reinterpret_cast<uint8_t *>(vec_.data()) + index * chunk_size,
       std::min(static_cast<std::size_t>(chunk_size),
                vec_.capacity() * sizeof(T) - index * chunk_size));
+  cycles = get_cycles_end() - cycles;
+  record_overhead(SERVER_DF_VECTOR_READ, cycles);
+  report_on_count(SERVER_DF_VECTOR_READ, 1000000);
 }
 
 template <typename T>

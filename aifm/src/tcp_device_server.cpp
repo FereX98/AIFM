@@ -10,6 +10,7 @@ extern "C" {
 #include "helpers.hpp"
 #include "object.hpp"
 #include "server.hpp"
+#include "profiler.hpp"
 
 #include <atomic>
 #include <cstdlib>
@@ -275,6 +276,8 @@ void do_work(uint16_t port) {
   tcpqueue_t *q;
   struct netaddr server_addr = {.ip = 0, .port = port};
   tcp_listen(server_addr, 1, &q);
+
+  reset_profilers();
 
   tcpconn_t *c;
   while (tcp_accept(q, &c) == 0) {

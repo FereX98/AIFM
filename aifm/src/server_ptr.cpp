@@ -7,6 +7,7 @@ extern "C" {
 
 #include "object.hpp"
 #include "server_ptr.hpp"
+#include "profiler.hpp"
 
 namespace far_memory {
 
@@ -21,6 +22,7 @@ ServerPtr::~ServerPtr() {}
 
 void ServerPtr::read_object(uint8_t obj_id_len, const uint8_t *obj_id,
                             uint16_t *data_len, uint8_t *data_buf) {
+  uint64_t cycles = get_cycles_start();
   const uint64_t &object_id = *(reinterpret_cast<const uint64_t *>(obj_id));
   assert(obj_id_len == sizeof(decltype(object_id)));
   auto remote_object_addr = reinterpret_cast<uint64_t>(buf_.get()) + object_id;
@@ -28,6 +30,9 @@ void ServerPtr::read_object(uint8_t obj_id_len, const uint8_t *obj_id,
   *data_len = remote_object.get_data_len();
   memcpy(data_buf, reinterpret_cast<uint8_t *>(remote_object.get_data_addr()),
          *data_len);
+  cycles = get_cycles_end() - cycles;
+  record_overhead(SERVER_PTR_READ, cycles);
+  report_on_count(SERVER_PTR_READ, 100000);
 }
 
 void ServerPtr::write_object(uint8_t obj_id_len, const uint8_t *obj_id,
