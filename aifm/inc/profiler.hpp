@@ -2,6 +2,26 @@
 #include <atomic>
 #include <cstdio>
 
+//#define ENABLE_PROFILER
+
+struct overhead_profiler {
+    std::atomic<uint64_t> accumulated_cycles;
+    std::atomic<uint64_t> accumulated_count;
+};
+
+enum overhead_profiler_type {
+    FASTPATH,
+	BARRIER_SWAP_IN,
+	BARRIER_MIGRATION,
+	SWAP_IN_PREP,
+	SWAP_IN_READ,
+	SWAP_IN_INIT,
+	SERVER_DF_VECTOR_READ,
+	SERVER_PTR_READ,
+    NUM_OVERHEAD_TYPES
+};
+
+#ifdef ENABLE_PROFILER
 // time utils
 // reference cycles.
 // #1, Fix the clock cycles of CPU.
@@ -38,28 +58,10 @@ static inline uint64_t get_cycles_end(void)
 	return ((uint64_t)cycles_high << 32) + (uint64_t)cycles_low;
 }
 
-struct overhead_profiler {
-    std::atomic<uint64_t> accumulated_cycles;
-    std::atomic<uint64_t> accumulated_count;
-};
-
-enum overhead_profiler_type {
-    FASTPATH,
-	BARRIER_SWAP_IN,
-	BARRIER_MIGRATION,
-	SWAP_IN_PREP,
-	SWAP_IN_READ,
-	SWAP_IN_INIT,
-	SERVER_DF_VECTOR_READ,
-	SERVER_PTR_READ,
-    NUM_OVERHEAD_TYPES
-};
-
 extern struct overhead_profiler profilers[NUM_OVERHEAD_TYPES];
 
 static inline void reset_profilers(void)
 {
-	std::printf("Resetting profilers\n");
     for (int i = 0; i < NUM_OVERHEAD_TYPES; i++) {
         profilers[i].accumulated_cycles = 0;
         profilers[i].accumulated_count = 0;
@@ -77,7 +79,8 @@ static inline void record_counter(enum overhead_profiler_type type)
     profilers[type].accumulated_count++;
 }
 
-static inline void report_stats(void) {
+static inline void report_stats(void)
+{
     for (int i = 0; i < NUM_OVERHEAD_TYPES; i++) {
         std::printf("Profiler %d: %lu cycles, %lu count\n", i, profilers[i].accumulated_cycles.load(), profilers[i].accumulated_count.load());
     }
@@ -90,3 +93,32 @@ static inline void report_on_count(enum overhead_profiler_type type, uint64_t ti
         std::fflush(stdout);
     }
 }
+#else // ENABLE_PROFILER
+static inline uint64_t get_cycles_start(void)
+{
+	return 0;
+}
+static inline uint64_t get_cycles_end(void)
+{
+	return 0;
+}
+static inline void reset_profilers(void)
+{
+}
+
+static inline void record_overhead(enum overhead_profiler_type type, uint64_t cycles)
+{
+}
+
+static inline void record_counter(enum overhead_profiler_type type)
+{
+}
+
+static inline void report_stats(void)
+{
+}
+
+static inline void report_on_count(enum overhead_profiler_type type, uint64_t times)
+{
+}
+#endif // ENABLE_PROFILER
