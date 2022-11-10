@@ -2,7 +2,7 @@
 #include <atomic>
 #include <cstdio>
 
-//#define ENABLE_PROFILER
+#define ENABLE_PROFILER
 
 struct overhead_profiler {
     std::atomic<uint64_t> accumulated_cycles;
@@ -11,11 +11,13 @@ struct overhead_profiler {
 
 enum overhead_profiler_type {
     FASTPATH,
-	BARRIER_SWAP_IN,
+	BARRIER_ENTER_SWAP_IN,
+	BARRIER_NOT_PRESENT_SWAP_IN,
+	BARRIER_SWAP_IN_READ,
 	BARRIER_MIGRATION,
-	SWAP_IN_PREP,
-	SWAP_IN_READ,
-	SWAP_IN_INIT,
+	PREFETCH_SWAP_IN_PREP,
+	PREFETCH_SWAP_IN_READ,
+	PREFETCH_SWAP_IN_INIT,
 	SERVER_DF_VECTOR_READ,
 	SERVER_PTR_READ,
     NUM_OVERHEAD_TYPES

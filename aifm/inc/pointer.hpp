@@ -113,7 +113,7 @@ protected:
 public:
   void nullify();
   bool is_null() const;
-  void swap_in(bool nt);
+  void swap_in(bool nt, bool on_demand = false);
   void flush();
   void move(GenericFarMemPtr &other, uint64_t reset_value);
 };

@@ -54,8 +54,8 @@ void FarMemPtrMeta::gc_wb(uint8_t ds_id, uint16_t object_size,
   from_uint64_t(new_metadata);
 }
 
-void GenericFarMemPtr::swap_in(bool nt) {
-  FarMemManagerFactory::get()->swap_in(nt, this);
+void GenericFarMemPtr::swap_in(bool nt, bool on_demand) {
+  FarMemManagerFactory::get()->swap_in(nt, this, on_demand);
 }
 
 bool GenericFarMemPtr::mutator_migrate_object() {

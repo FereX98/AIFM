@@ -122,7 +122,7 @@ private:
   bool is_free_cache_high() const;
   std::optional<Region> pop_cache_used_region();
   void push_cache_free_region(Region &region);
-  void swap_in(bool nt, GenericFarMemPtr *ptr);
+  void swap_in(bool nt, GenericFarMemPtr *ptr, bool on_demand = false);
   void swap_out(GenericFarMemPtr *ptr, Object obj);
   void launch_gc_master();
   void gc_cache();

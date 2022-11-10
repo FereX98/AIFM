@@ -254,14 +254,22 @@ FarMemManager::RegionManager::RegionManager(uint64_t size, bool is_local) {
 
 #include "profiler.hpp"
 
-void FarMemManager::swap_in(bool nt, GenericFarMemPtr *ptr) {
+void FarMemManager::swap_in(bool nt, GenericFarMemPtr *ptr, bool on_demand) {
   assert(preempt_enabled());
 
   uint64_t cycles_swap_in_prep = get_cycles_start();
 
+  if (on_demand) {
+    record_counter(BARRIER_ENTER_SWAP_IN);
+  }
+
   auto meta_snapshot = ptr->meta();
   if (unlikely(meta_snapshot.is_present())) {
     return;
+  }
+
+  if (on_demand) {
+    record_counter(BARRIER_NOT_PRESENT_SWAP_IN);
   }
 
   auto obj_id = meta_snapshot.get_object_id();
@@ -280,13 +288,19 @@ void FarMemManager::swap_in(bool nt, GenericFarMemPtr *ptr) {
     uint16_t obj_data_len;
     auto obj_data_addr = reinterpret_cast<uint8_t *>(obj.get_data_addr());
     cycles_swap_in_prep = get_cycles_end() - cycles_swap_in_prep;
-    record_overhead(SWAP_IN_PREP, cycles_swap_in_prep);
+    if (!on_demand) {
+      record_overhead(PREFETCH_SWAP_IN_PREP, cycles_swap_in_prep);
+    }
     uint64_t cycles_swap_in_read = get_cycles_start();
     device_ptr_->read_object(ds_id, sizeof(obj_id),
                              reinterpret_cast<uint8_t *>(&obj_id),
                              &obj_data_len, obj_data_addr);
     cycles_swap_in_read = get_cycles_end() - cycles_swap_in_read;
-    record_overhead(SWAP_IN_READ, cycles_swap_in_read);
+    if (on_demand) {
+      record_overhead(BARRIER_SWAP_IN_READ, cycles_swap_in_read);
+    } else {
+      record_overhead(PREFETCH_SWAP_IN_READ, cycles_swap_in_read);
+    }
     uint64_t cycles_swap_in_init = get_cycles_start();
     wmb();
     obj.init(ds_id, obj_data_len, sizeof(obj_id),
@@ -299,7 +313,9 @@ void FarMemManager::swap_in(bool nt, GenericFarMemPtr *ptr) {
     }
     Region::atomic_inc_ref_cnt(obj_addr, -1);
     cycles_swap_in_init = get_cycles_end() - cycles_swap_in_init;
-    record_overhead(SWAP_IN_INIT, cycles_swap_in_init);
+    if (!on_demand) {
+      record_overhead(PREFETCH_SWAP_IN_INIT, cycles_swap_in_init);
+    }
   }
 }
 

@@ -192,8 +192,7 @@ retry:
           // In this case, _deref() returns nullptr.
           return nullptr;
         }
-        swap_in(Nt);
-        record_counter(BARRIER_SWAP_IN);
+        swap_in(Nt, true);
         // Just swapped in, need to update metadata (for the obj data addr).
         metadata = meta().to_uint64_t();
       } else {
