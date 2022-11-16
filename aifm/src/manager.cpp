@@ -12,6 +12,7 @@ extern "C" {
 
 #include "deref_scope.hpp"
 #include "manager.hpp"
+#include "profiler.hpp"
 
 #include <algorithm>
 #include <cassert>
@@ -252,8 +253,6 @@ FarMemManager::RegionManager::RegionManager(uint64_t size, bool is_local) {
   }
 }
 
-#include "profiler.hpp"
-
 void FarMemManager::swap_in(bool nt, GenericFarMemPtr *ptr, bool on_demand) {
   assert(preempt_enabled());
 
@@ -288,7 +287,9 @@ void FarMemManager::swap_in(bool nt, GenericFarMemPtr *ptr, bool on_demand) {
     uint16_t obj_data_len;
     auto obj_data_addr = reinterpret_cast<uint8_t *>(obj.get_data_addr());
     cycles_swap_in_prep = get_cycles_end() - cycles_swap_in_prep;
-    if (!on_demand) {
+    if (on_demand) {
+      record_overhead(BARRIER_SWAP_IN_PREP, cycles_swap_in_prep);
+    } else {
       record_overhead(PREFETCH_SWAP_IN_PREP, cycles_swap_in_prep);
     }
     uint64_t cycles_swap_in_read = get_cycles_start();
@@ -313,7 +314,9 @@ void FarMemManager::swap_in(bool nt, GenericFarMemPtr *ptr, bool on_demand) {
     }
     Region::atomic_inc_ref_cnt(obj_addr, -1);
     cycles_swap_in_init = get_cycles_end() - cycles_swap_in_init;
-    if (!on_demand) {
+    if (on_demand) {
+      record_overhead(BARRIER_SWAP_IN_INIT, cycles_swap_in_init);
+    } else {
       record_overhead(PREFETCH_SWAP_IN_INIT, cycles_swap_in_init);
     }
   }

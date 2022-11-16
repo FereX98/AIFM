@@ -2,6 +2,7 @@
 #include "deref_scope.hpp"
 #include "helpers.hpp"
 #include "manager.hpp"
+#include "profiler.hpp"
 
 #include <cstdint>
 
@@ -59,6 +60,9 @@ void GenericFarMemPtr::swap_in(bool nt, bool on_demand) {
 }
 
 bool GenericFarMemPtr::mutator_migrate_object() {
+
+  uint64_t cycles = get_cycles_start();
+
   auto *manager = FarMemManagerFactory::get();
 
   auto object = meta().object();
@@ -86,6 +90,9 @@ bool GenericFarMemPtr::mutator_migrate_object() {
     return false;
   }
   auto new_local_object_addr = *optional_new_local_object_addr;
+  cycles = get_cycles_end() - cycles;
+  record_overhead(BARRIER_MIGRATION_PREP, cycles);
+  cycles = get_cycles_start();
   if (auto copy_notifier = manager->copy_notifiers_[object.get_ds_id()]) {
     memcpy(reinterpret_cast<void *>(new_local_object_addr),
            reinterpret_cast<void *>(object.get_addr()), Object::kHeaderSize);
@@ -96,6 +103,9 @@ bool GenericFarMemPtr::mutator_migrate_object() {
     memcpy(reinterpret_cast<void *>(new_local_object_addr),
            reinterpret_cast<void *>(object.get_addr()), object_size);
   }
+  cycles = get_cycles_end() - cycles;
+  record_overhead(BARRIER_MIGRATION_MOVE, cycles);
+  cycles = get_cycles_start();
   Region::atomic_inc_ref_cnt(new_local_object_addr, -1);
 
   if (!meta().is_shared()) {
@@ -107,6 +117,8 @@ bool GenericFarMemPtr::mutator_migrate_object() {
         });
   }
   object.free();
+  cycles = get_cycles_end() - cycles;
+  record_overhead(BARRIER_MIGRATION_INIT, cycles);
   return true;
 }
 

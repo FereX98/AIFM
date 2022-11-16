@@ -196,15 +196,12 @@ retry:
         // Just swapped in, need to update metadata (for the obj data addr).
         metadata = meta().to_uint64_t();
       } else {
-        uint64_t cycles_migration = get_cycles_start();
+        record_counter(BARRIER_MIGRATION_ENTER);
         if (!mutator_migrate_object()) {
           // GC or another thread wins the race. They may still need a while to
           // finish migrating the object. Yielding itself rather than busy
           // retrying now.
           thread_yield();
-        } else {
-          cycles_migration = get_cycles_end() - cycles_migration;
-          record_overhead(BARRIER_MIGRATION, cycles_migration);
         }
       }
       goto retry;

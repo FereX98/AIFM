@@ -13,8 +13,13 @@ enum overhead_profiler_type {
     FASTPATH,
 	BARRIER_ENTER_SWAP_IN,
 	BARRIER_NOT_PRESENT_SWAP_IN,
+	BARRIER_SWAP_IN_PREP,
 	BARRIER_SWAP_IN_READ,
-	BARRIER_MIGRATION,
+	BARRIER_SWAP_IN_INIT,
+	BARRIER_MIGRATION_ENTER,
+	BARRIER_MIGRATION_PREP,
+	BARRIER_MIGRATION_MOVE,
+	BARRIER_MIGRATION_INIT,
 	PREFETCH_SWAP_IN_PREP,
 	PREFETCH_SWAP_IN_READ,
 	PREFETCH_SWAP_IN_INIT,
@@ -22,6 +27,8 @@ enum overhead_profiler_type {
 	SERVER_PTR_READ,
     NUM_OVERHEAD_TYPES
 };
+
+extern const char* overhead_profiler_type_names[NUM_OVERHEAD_TYPES];
 
 #ifdef ENABLE_PROFILER
 // time utils
@@ -84,7 +91,7 @@ static inline void record_counter(enum overhead_profiler_type type)
 static inline void report_stats(void)
 {
     for (int i = 0; i < NUM_OVERHEAD_TYPES; i++) {
-        std::printf("Profiler %d: %lu cycles, %lu count\n", i, profilers[i].accumulated_cycles.load(), profilers[i].accumulated_count.load());
+        std::printf("Profiler %s: %lu cycles, %lu count\n", overhead_profiler_type_names[i], profilers[i].accumulated_cycles.load(), profilers[i].accumulated_count.load());
     }
 }
 
