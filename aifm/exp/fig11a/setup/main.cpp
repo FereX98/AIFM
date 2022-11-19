@@ -12,9 +12,10 @@ using namespace std;
 
 string read_file_to_string(const string &file_path) {
   ifstream fs(file_path);
-  auto guard = helpers::finally([&]() { fs.close(); });
-  return string((std::istreambuf_iterator<char>(fs)),
+  auto str = string((std::istreambuf_iterator<char>(fs)),
                 std::istreambuf_iterator<char>());
+  fs.close();
+  return str;
 }
 
 void write_file_to_string(const string &file_path, const string &str) {
@@ -31,7 +32,7 @@ void compress_file(const string &in_file_path, const string &out_file_path) {
 }
 
 int main(int argc, char *argv[]) {
-  compress_file("/mnt/enwik9.uncompressed", "/mnt/enwik9.compressed");
+  compress_file("/mnt/ssd/data/enwik9.uncompressed", "/mnt/ssd/data/enwik9.compressed");
 
   return 0;
 }

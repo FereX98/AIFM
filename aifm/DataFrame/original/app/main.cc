@@ -12,6 +12,8 @@
 
 using namespace hmdf;
 
+#define PRINT_OUTPUT
+
 // Download dataset at https://www1.nyc.gov/site/tlc/about/tlc-trip-record-data.page.
 // The following code is implemented based on the format of 2016 datasets.
 
@@ -32,11 +34,13 @@ static double haversine(double lat1, double lon1, double lat2, double lon2)
     return rad * c;
 }
 
-StdDataFrame<uint64_t> load_data()
+StdDataFrame<uint64_t> load_data(int index)
 {
+    //std::string file_name = "/mnt/ssd/data/chunks1000/yellow_tripdata_2016-01-" + std::to_string(index) + ".csv";
+    std::string file_name = "/mnt/ssd/data/all.csv";
     return read_csv<-1, int, SimpleTime, SimpleTime, int, double, double, double, int, char, double,
                     double, int, double, double, double, double, double, double, double>(
-        "/mnt/all.csv", "VendorID", "tpep_pickup_datetime", "tpep_dropoff_datetime",
+        file_name, "VendorID", "tpep_pickup_datetime", "tpep_dropoff_datetime",
         "passenger_count", "trip_distance", "pickup_longitude", "pickup_latitude", "RatecodeID",
         "store_and_fwd_flag", "dropoff_longitude", "dropoff_latitude", "payment_type",
         "fare_amount", "extra", "mta_tax", "tip_amount", "tolls_amount", "improvement_surcharge",
@@ -243,29 +247,60 @@ void analyze_trip_durations_of_timestamps(StdDataFrame<uint64_t>& df, const char
     std::cout << std::endl;
 }
 
+//sleep()
+#include <unistd.h>
+
 int main()
 {
     std::chrono::time_point<std::chrono::steady_clock> times[10];
-    auto df  = load_data();
+    std::chrono::time_point<std::chrono::steady_clock> time_before_load;
+    std::cout << "start loading" << std::endl;
+    time_before_load = std::chrono::steady_clock::now();
+    int num_files = 1;
+    int starting_num_of_file = 0;
+    int ending_num = starting_num_of_file + num_files;
+    std::vector<StdDataFrame<uint64_t>> dfs;
+    dfs.reserve(num_files);
+    #ifndef PRINT_OUTPUT
+        std::cout.setstate(std::ios::failbit);
+    #endif // PRINT_OUTPUT
+    for (int i = starting_num_of_file; i < ending_num; ++i) {
+        dfs.emplace_back(load_data(i));
+        std::cout << "loaded one" << std::endl;
+    }
+    #ifndef PRINT_OUTPUT
+        std::cout.clear();
+    #endif // PRINT_OUTPUT
+    //auto df  = load_data();
     times[0] = std::chrono::steady_clock::now();
-    print_number_vendor_ids_and_unique(df);
-    times[1] = std::chrono::steady_clock::now();
-    print_passage_counts_by_vendor_id(df, 1);
-    times[2] = std::chrono::steady_clock::now();
-    print_passage_counts_by_vendor_id(df, 2);
-    times[3] = std::chrono::steady_clock::now();
-    calculate_trip_duration(df);
-    times[4] = std::chrono::steady_clock::now();
-    calculate_distribution_store_and_fwd_flag(df);
-    times[5] = std::chrono::steady_clock::now();
-    calculate_haversine_distance_column(df);
-    times[6] = std::chrono::steady_clock::now();
-    analyze_trip_timestamp(df);
-    times[7] = std::chrono::steady_clock::now();
-    analyze_trip_durations_of_timestamps<char>(df, "pickup_day");
-    times[8] = std::chrono::steady_clock::now();
-    analyze_trip_durations_of_timestamps<char>(df, "pickup_month");
+    std::cout << "time taken to load: " << std::chrono::duration_cast<std::chrono::microseconds>(times[0] - time_before_load).count() << " us" << std::endl;
+    #ifndef PRINT_OUTPUT
+        std::cout.setstate(std::ios::failbit);
+    #endif // PRINT_OUTPUT
+    for (int i = 0; i < num_files; ++i) {
+        print_number_vendor_ids_and_unique(dfs[i]);
+        times[1] = std::chrono::steady_clock::now();
+        print_passage_counts_by_vendor_id(dfs[i], 1);
+        times[2] = std::chrono::steady_clock::now();
+        print_passage_counts_by_vendor_id(dfs[i], 2);
+        times[3] = std::chrono::steady_clock::now();
+        calculate_trip_duration(dfs[i]);
+        times[4] = std::chrono::steady_clock::now();
+        calculate_distribution_store_and_fwd_flag(dfs[i]);
+        times[5] = std::chrono::steady_clock::now();
+        calculate_haversine_distance_column(dfs[i]);
+        times[6] = std::chrono::steady_clock::now();
+        analyze_trip_timestamp(dfs[i]);
+        times[7] = std::chrono::steady_clock::now();
+        analyze_trip_durations_of_timestamps<char>(dfs[i], "pickup_day");
+        times[8] = std::chrono::steady_clock::now();
+        analyze_trip_durations_of_timestamps<char>(dfs[i], "pickup_month");
+    }
+    #ifndef PRINT_OUTPUT
+        std::cout.clear();
+    #endif // PRINT_OUTPUT
     times[9] = std::chrono::steady_clock::now();
+    
 
     for (uint32_t i = 1; i < std::size(times); i++) {
         std::cout << "Step " << i << ": "
@@ -276,6 +311,8 @@ int main()
     std::cout << "Total: "
               << std::chrono::duration_cast<std::chrono::microseconds>(times[9] - times[0]).count()
               << " us" << std::endl;
+
+    //sleep(100);
 
     return 0;
 }

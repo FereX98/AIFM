@@ -4,11 +4,11 @@ DISK=/dev/sda4
 SHELL_PWD=`pwd`
 
 # Format disk.
-sudo umount $DISK
-echo Y | sudo mkfs.ext4 $DISK
-sudo mount $DISK /mnt
-sudo chmod a+rw /mnt
-cd /mnt
+#sudo umount $DISK
+#echo Y | sudo mkfs.ext4 $DISK
+#sudo mount $DISK /mnt
+#sudo chmod a+rw /mnt
+cd /mnt/ssd/data
 
 # Download ucompressed input.
 wget http://cs.fit.edu/~mmahoney/compression/enwik9.zip

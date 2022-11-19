@@ -1,14 +1,5 @@
-extern "C" {
-#include <runtime/runtime.h>
-}
 
 #include "snappy.h"
-
-#include "array.hpp"
-#include "deref_scope.hpp"
-#include "device.hpp"
-#include "helpers.hpp"
-#include "manager.hpp"
 
 #include <fcntl.h>
 #include <fstream>
@@ -17,6 +8,7 @@ extern "C" {
 #include <streambuf>
 #include <string>
 #include <unistd.h>
+#include <chrono>
 
 using namespace std;
 
@@ -26,7 +18,8 @@ void *buffers[kNumUncompressedFiles - 1];
 
 string read_file_to_string(const string &file_path) {
   ifstream fs(file_path);
-  auto guard = helpers::finally([&]() { fs.close(); });
+  // No need to explicitly close the file as the destructor will do it.
+  //auto guard = helpers::finally([&]() { fs.close(); });
   return string((std::istreambuf_iterator<char>(fs)),
                 std::istreambuf_iterator<char>());
 }
@@ -51,13 +44,15 @@ void compress_file(const string &in_file_path, const string &out_file_path) {
 
 void compress_files_bench(const string &in_file_path,
                           const string &out_file_path) {
+  auto before_string_loading = chrono::steady_clock::now();
   string in_str = read_file_to_string(in_file_path);
   string out_str;
-
+  auto before_buffer_copying = chrono::steady_clock::now();
   for (uint32_t i = 0; i < kNumUncompressedFiles - 1; i++) {
-    buffers[i] = numa_alloc_onnode(kUncompressedFileSize, 1);
+    buffers[i] = numa_alloc_onnode(kUncompressedFileSize, 0);
     if (buffers[i] == nullptr) {
-      helpers::dump_core();
+      std::cerr << "failed to allocate buffer " << i << std::endl;
+      exit(-1);
     }
     memcpy(buffers[i], in_str.data(), in_str.size());
   }
@@ -75,6 +70,12 @@ void compress_files_bench(const string &in_file_path,
   auto end = chrono::steady_clock::now();
   cout << "Elapsed time in microseconds : "
        << chrono::duration_cast<chrono::microseconds>(end - start).count()
+       << " µs" << endl
+       << "String loading time in microseconds : "
+       << chrono::duration_cast<chrono::microseconds>(before_buffer_copying - before_string_loading).count()
+       << " µs" << endl
+       << "Buffer copying time in microseconds : "
+       << chrono::duration_cast<chrono::microseconds>(start - before_buffer_copying).count()
        << " µs" << endl;
 
   for (uint32_t i = 0; i < kNumUncompressedFiles - 1; i++) {
@@ -85,12 +86,12 @@ void compress_files_bench(const string &in_file_path,
 }
 
 void do_work(void *arg) {
-  compress_files_bench("/mnt/enwik9.uncompressed",
-                       "/mnt/enwik9.compressed.tmp");
+  compress_files_bench("/mnt/ssd/data/enwik9.uncompressed",
+                       "/mnt/ssd/data/enwik9.compressed.tmp");
 }
 
 int main(int argc, char *argv[]) {
-  int ret;
+  /*int ret;
 
   if (argc < 2) {
     std::cerr << "usage: [cfg_file]" << std::endl;
@@ -101,7 +102,9 @@ int main(int argc, char *argv[]) {
   if (ret) {
     std::cerr << "failed to start runtime" << std::endl;
     return ret;
-  }
+  }*/
+
+  do_work(NULL);
 
   return 0;
 }

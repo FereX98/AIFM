@@ -22,7 +22,7 @@ extern "C" {
 using namespace hmdf;
 using namespace far_memory;
 
-constexpr uint64_t kCacheGBs            = 1;
+constexpr uint64_t kCacheGBs = 1;
 constexpr uint64_t kCacheSize           = kCacheGBs << 30;
 constexpr uint64_t kFarMemSize          = (1ULL << 30);  // 1 GB. Not relevant here.
 constexpr uint64_t kNumGCThreads        = 40;
@@ -52,7 +52,7 @@ StdDataFrame<Index_t> load_data(FarMemManager* manager)
 {
     return read_csv<-1, int, SimpleTime, SimpleTime, int, double, double, double, int, char, double,
                     double, int, double, double, double, double, double, double, double>(
-        manager, "/mnt/all.csv", "VendorID", "tpep_pickup_datetime", "tpep_dropoff_datetime",
+        manager, "/mnt/ssd/data/all.csv", "VendorID", "tpep_pickup_datetime", "tpep_dropoff_datetime",
         "passenger_count", "trip_distance", "pickup_longitude", "pickup_latitude", "RatecodeID",
         "store_and_fwd_flag", "dropoff_longitude", "dropoff_latitude", "payment_type",
         "fare_amount", "extra", "mta_tax", "tip_amount", "tolls_amount", "improvement_surcharge",
