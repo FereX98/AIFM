@@ -1,0 +1,50 @@
+diff --git a/drivers/net/ifc/base/ifcvf.h b/drivers/net/ifc/base/ifcvf.h
+index f026c70ab5..d37544c47c 100644
+--- a/drivers/net/ifc/base/ifcvf.h
++++ b/drivers/net/ifc/base/ifcvf.h
+@@ -13,7 +13,7 @@
+ #define IFCVF_SUBSYS_DEVICE_ID	0x001A
+ 
+ #define IFCVF_MAX_QUEUES		1
+-#define VIRTIO_F_IOMMU_PLATFORM		33
++//#define VIRTIO_F_IOMMU_PLATFORM		33
+ 
+ /* Common configuration */
+ #define IFCVF_PCI_CAP_COMMON_CFG	1
+diff --git a/kernel/linux/igb_uio/igb_uio.c b/kernel/linux/igb_uio/igb_uio.c
+index 3cf394bdf7..337e1d9915 100644
+--- a/kernel/linux/igb_uio/igb_uio.c
++++ b/kernel/linux/igb_uio/igb_uio.c
+@@ -206,6 +206,9 @@ igbuio_pci_irqhandler(int irq, void *dev_id)
+ 	return IRQ_HANDLED;
+ }
+ 
++// Shi: compatible
++#pragma GCC diagnostic push
++#pragma GCC diagnostic ignored "-Wimplicit-fallthrough"
+ static int
+ igbuio_pci_enable_interrupts(struct rte_uio_pci_dev *udev)
+ {
+@@ -287,6 +290,7 @@ igbuio_pci_enable_interrupts(struct rte_uio_pci_dev *udev)
+ 
+ 	return err;
+ }
++#pragma GCC diagnostic pop
+ 
+ static void
+ igbuio_pci_disable_interrupts(struct rte_uio_pci_dev *udev)
+diff --git a/kernel/linux/kni/kni_net.c b/kernel/linux/kni/kni_net.c
+index 7371b6d58a..fdc2bc6d63 100644
+--- a/kernel/linux/kni/kni_net.c
++++ b/kernel/linux/kni/kni_net.c
+@@ -581,8 +581,9 @@ kni_net_rx(struct kni_dev *kni)
+ /*
+  * Deal with a transmit timeout.
+  */
++// Shi: compatible
+ static void
+-kni_net_tx_timeout(struct net_device *dev)
++kni_net_tx_timeout(struct net_device *dev, unsigned int txqueue)
+ {
+ 	struct kni_dev *kni = netdev_priv(dev);
+ 

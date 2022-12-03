@@ -20,6 +20,10 @@ chmod uga+rwx /dev/pcicfg
 
 # reserve huge pages
 echo 8192 > /sys/devices/system/node/node0/hugepages/hugepages-2048kB/nr_hugepages
+if [ -d /sys/devices/system/node/node1 ]; then
+  echo "Setting huge pages for node1, please edit the script if there are more than 2 NUMA nodes"
+  echo 8192 > /sys/devices/system/node/node1/hugepages/hugepages-2048kB/nr_hugepages
+fi
 
 # revoke any CAT settings
 modprobe msr

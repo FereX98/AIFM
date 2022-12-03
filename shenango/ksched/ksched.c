@@ -127,8 +127,9 @@ static void ksched_next_tid(struct ksched_percpu *kp, int cpu, pid_t tid)
 		return;
 	}
 
-	if (WARN_ON_ONCE(p->on_cpu || p->state == TASK_WAKING ||
-			 p->state == TASK_RUNNING)) {
+	// shi: compatibility with kernel 5.14
+	if (WARN_ON_ONCE(p->on_cpu || p->__state == TASK_WAKING ||
+			 p->__state == TASK_RUNNING)) {
 		rcu_read_unlock();
 		return;
 	}
@@ -541,7 +542,9 @@ static int __init ksched_cpuidle_hijack(void)
 	drv = cpuidle_get_driver();
 	if (!drv)
 		return -ENOENT;
-	if (drv->state_count <= 0 || drv->states[0].disabled)
+	// linux-5.14-rc5/include/linux/cpuidle.h does not have a `disabled` field
+	//if (drv->state_count <= 0 || drv->states[0].disabled)
+	if (drv->state_count <= 0)
 		return -EINVAL;
 
 	cpuidle_pause_and_lock();
