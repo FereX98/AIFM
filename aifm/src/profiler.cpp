@@ -5,6 +5,7 @@ struct overhead_profiler profilers[NUM_OVERHEAD_TYPES];
 
 const char* overhead_profiler_type_names[NUM_OVERHEAD_TYPES] = {
 	"FASTPATH",
+	"DEREF_SCOPE",
 	"BARRIER_ENTER_SWAP_IN",
 	"BARRIER_NOT_PRESENT_SWAP_IN",
 	"BARRIER_SWAP_IN_PREP",
@@ -19,5 +20,11 @@ const char* overhead_profiler_type_names[NUM_OVERHEAD_TYPES] = {
 	"PREFETCH_SWAP_IN_INIT",
 	"SERVER_DF_VECTOR_READ",
 	"SERVER_PTR_READ",
+	"REMOTE_DS_CONSTRUCT",
+	"REMOTE_DS_DESTRUCT",
+	"REMOTE_DS_EXPAND",
+#ifdef STW_GC
+	"STW_GC_LATENCY",
+#endif
 };
 #endif

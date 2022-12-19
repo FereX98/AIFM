@@ -19,7 +19,7 @@ extern "C" {
 #include <string>
 #include <unistd.h>
 
-constexpr uint64_t kCacheSize = 22432 * Region::kSize;
+constexpr uint64_t kCacheSize = 18432 * Region::kSize;
 constexpr uint64_t kFarMemSize = 20ULL << 30;
 constexpr uint64_t kNumGCThreads = 15;
 constexpr uint64_t kNumConnections = 600;
@@ -79,16 +79,16 @@ void read_files_to_fm_array(const string &in_file_path) {
           file_block;
     }
     sum += cur;
-    if ((sum % (1 << 20)) == 0) {
+    /*if ((sum % (1 << 20)) == 0) {
       cerr << "Have read " << sum << " bytes." << endl;
-    }
+    }*/
   }
   if (sum != kUncompressedFileSize) {
     helpers::dump_core();
   }
 
   // Flush the cache to ensure there's no pending dirty data.
-  flush_cache();
+  //flush_cache();
 
   close(fd);
 }
@@ -96,6 +96,7 @@ void read_files_to_fm_array(const string &in_file_path) {
 void fm_compress_files_bench(const string &in_file_path,
                              const string &out_file_path) {
   string out_str;
+  auto pre_read = chrono::steady_clock::now();
   read_files_to_fm_array(in_file_path);
   auto start = chrono::steady_clock::now();
   for (uint32_t i = 0; i < kNumUncompressedFiles; i++) {
@@ -106,6 +107,9 @@ void fm_compress_files_bench(const string &in_file_path,
   auto end = chrono::steady_clock::now();
   cout << "Elapsed time in microseconds : "
        << chrono::duration_cast<chrono::microseconds>(end - start).count()
+       << " µs" << endl
+       << "Load time in microseconds : "
+       << chrono::duration_cast<chrono::microseconds>(start - pre_read).count()
        << " µs" << endl;
 
   // write_file_to_string(out_file_path, out_str);
@@ -120,8 +124,8 @@ void do_work(netaddr raddr) {
         manager->allocate_array_heap<snappy::FileBlock,
                                      kUncompressedFileNumBlocks>());
   }
-  fm_compress_files_bench("/mnt/enwik9.uncompressed",
-                          "/mnt/enwik9.compressed.tmp");
+  fm_compress_files_bench("/mnt/ssd/data/enwik9.uncompressed",
+                          "/mnt/ssd/data/enwik9.compressed.tmp");
 
   std::cout << "Force existing..." << std::endl;
   exit(0);

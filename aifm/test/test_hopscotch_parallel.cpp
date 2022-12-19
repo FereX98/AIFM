@@ -5,6 +5,7 @@ extern "C" {
 
 #include "concurrent_hopscotch.hpp"
 #include "concurrent_hopscotch_local.hpp"
+#include "local_concurrent_hopscotch.hpp"
 #include "helpers.hpp"
 #include "manager.hpp"
 
@@ -19,7 +20,7 @@ extern "C" {
 using namespace far_memory;
 using namespace std;
 
-constexpr static uint32_t kNumThreads = 10;
+constexpr static uint32_t kNumThreads = 23;
 constexpr static uint32_t kKeyMaxLen = 5;
 constexpr static uint32_t kValMaxLen = 10;
 constexpr static uint32_t kHashTableNumEntriesShift = 17;
@@ -52,16 +53,17 @@ std::string random_string(uint32_t max_len) {
   return str;
 }
 
-#ifdef RUN_LOCAL
-void thread_work_fn(int tid, GenericConcurrentHopscotchLocal *hopscotch) {
-#else
-void thread_work_fn(int tid, GenericConcurrentHopscotch *hopscotch) {
-#endif
+//#ifdef RUN_LOCAL
+//void thread_work_fn(int tid, GenericConcurrentHopscotchLocal *hopscotch) {
+//#else
+//void thread_work_fn(int tid, GenericConcurrentHopscotch *hopscotch) {
+//#endif
+void thread_work_fn(int tid, LocalGenericConcurrentHopscotch *hopscotch) {
   for (auto &op : ops[tid]) {
     if (op.opcode == Op::Get) {
       uint16_t val_len;
       char raw_val[kValMaxLen];
-      hopscotch->get_tp(op.key.size(),
+      hopscotch->get(op.key.size(),
                         reinterpret_cast<const uint8_t *>(op.key.c_str()),
                         &val_len, reinterpret_cast<uint8_t *>(raw_val));
       if (!val_len) {
@@ -69,22 +71,22 @@ void thread_work_fn(int tid, GenericConcurrentHopscotch *hopscotch) {
       }
       auto val = std::string(raw_val, val_len);
       std::string prefix = val.substr(0, val.find("_"));
-      cout << val << endl;
+      //cout << val << endl;
       auto suffix = std::stoi(val.substr(val.find("_") + 1));
       if (prefix != op.key || suffix < 0 ||
           suffix >= static_cast<int>(kNumThreads)) {
-        hopscotch->get_tp(op.key.size(),
+        hopscotch->get(op.key.size(),
                           reinterpret_cast<const uint8_t *>(op.key.c_str()),
                           &val_len, reinterpret_cast<uint8_t *>(raw_val));
         std::cout << "Failed" << std::endl;
         return;
       }
     } else if (op.opcode == Op::Put) {
-      hopscotch->put_tp(
+      hopscotch->put(
           op.key.size(), reinterpret_cast<const uint8_t *>(op.key.c_str()),
           op.val.size(), reinterpret_cast<const uint8_t *>(op.val.c_str()));
     } else if (op.opcode == Op::Remove) {
-      hopscotch->remove_tp(op.key.size(),
+      hopscotch->remove(op.key.size(),
                            reinterpret_cast<const uint8_t *>(op.key.c_str()));
     }
   }
@@ -93,13 +95,15 @@ void thread_work_fn(int tid, GenericConcurrentHopscotch *hopscotch) {
 void do_work(FarMemManager *manager) {
   cout << "Running " << __FILE__ "..." << endl;
 
-#ifdef RUN_LOCAL
-  auto hopscotch = manager->allocate_concurrent_hopscotch_local(
-#else
-  auto hopscotch = manager->allocate_concurrent_hopscotch(
-#endif
-      kHashTableNumEntriesShift, kHashTableNumEntriesShift,
-      kHashTableRemoteDataSize);
+//#ifdef RUN_LOCAL
+//  auto hopscotch = manager->allocate_concurrent_hopscotch_local(
+//#else
+//  auto hopscotch = manager->allocate_concurrent_hopscotch(
+//#endif
+//      kHashTableNumEntriesShift, kHashTableNumEntriesShift,
+//      kHashTableRemoteDataSize);
+  
+  auto hopscotch = LocalGenericConcurrentHopscotch(kHashTableNumEntriesShift, kHashTableRemoteDataSize);
 
   for (uint32_t i = 0; i < kNumKVPairs; i++) {
     auto key = random_string(kKeyMaxLen);

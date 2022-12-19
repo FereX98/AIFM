@@ -7,6 +7,8 @@ extern "C" {
 #include <runtime/thread.h>
 }
 
+#include "profiler.hpp"
+
 // Only count InScopeV0 and InScopeV1. OutofScope and GC is not counted.
 extern __thread int num_threads_on_status[3]; // Defined at runtime/ksched.c
 extern int *num_threads_on_status_ptrs[NCPU]; // Defined at runtime/ksched.c
@@ -18,6 +20,7 @@ FORCE_INLINE DerefScope::DerefScope() { enter(); }
 FORCE_INLINE DerefScope::~DerefScope() { exit(); }
 
 FORCE_INLINE void DerefScope::enter() {
+  record_counter(DEREF_SCOPE);
   // Disallow nested DerefScopes.
   assert(!is_in_deref_scope());
   // This is necessary for the low-speed far memory, since the swapout speed

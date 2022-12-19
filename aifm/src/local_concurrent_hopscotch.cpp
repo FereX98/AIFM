@@ -3,6 +3,7 @@
 #include "helpers.hpp"
 
 #include <cstring>
+#include <iostream>
 
 namespace far_memory {
 
@@ -70,6 +71,13 @@ void LocalGenericConcurrentHopscotch::get(uint8_t key_len, const uint8_t *key,
         if (header->key_len == key_len) {
           if (strncmp(slab_val_ptr + header->val_len,
                       reinterpret_cast<const char *>(key), key_len) == 0) {
+            if (strncmp(slab_val_ptr, reinterpret_cast<const char *>(key), key_len) != 0) {
+              std::cout << "key does not match value prefix" << std::endl;
+              std::cout << "key length: " << (int)(key_len) << std::endl;
+              std::cout << "key: " << reinterpret_cast<const char *>(key) << std::endl;
+              std::cout << "val: " << reinterpret_cast<const char *>(slab_val_ptr) << std::endl;
+              //assert(false);
+            }
             *val_len = header->val_len;
             memcpy(val, slab_val_ptr, *val_len);
             return true;

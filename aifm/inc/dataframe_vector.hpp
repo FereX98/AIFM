@@ -8,6 +8,7 @@
 #include "pointer.hpp"
 #include "prefetcher.hpp"
 #include "reader_writer_lock.hpp"
+#include "profiler.hpp"
 
 #include <cstdint>
 #include <memory>
@@ -135,8 +136,11 @@ private:
   std::unique_ptr<
       Prefetcher<decltype(kInduceFn), decltype(kInferFn), decltype(kMappingFn)>>
       prefetcher_;
-  // bool dynamic_prefetch_enabled_ = false;  
+  #ifdef DISABLE_PREFETCHER
+  bool dynamic_prefetch_enabled_ = false;  
+  #else //DISABLE_PREFETCHER
   bool dynamic_prefetch_enabled_ = true;  
+  #endif //DISABLE_PREFETCHER
 
   friend class FarMemTest;
   template <typename U> friend class ServerDataFrameVector;

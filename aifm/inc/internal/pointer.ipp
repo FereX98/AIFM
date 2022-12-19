@@ -167,13 +167,10 @@ FORCE_INLINE uint8_t FarMemPtrMeta::get_ds_id() const {
   return metadata_[kDSIDPos];
 }
 
+#define NO_FAST_PATH_OVERHEAD
+
 template <bool Mut, bool Nt, bool Shared>
 FORCE_INLINE void *GenericFarMemPtr::_deref() {
-  //static uint64_t local_counter = 0;
-  //uint64_t cycles = 0;
-  //if(local_counter < 1000000) {
-    //cycles = get_cycles_start();
-  //}
 retry:
   // 1) movq.
   auto metadata = meta().to_uint64_t();
@@ -219,7 +216,9 @@ retry:
     meta().metadata_[FarMemPtrMeta::kHotPos]--;
   }
 
+  #ifndef NO_FAST_PATH_OVERHEAD
   record_counter(FASTPATH);
+  #endif
 
   // 4) shrq.
   return reinterpret_cast<void *>(metadata >>

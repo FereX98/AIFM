@@ -3,6 +3,7 @@
 #include "aggregator.hpp"
 #include "helpers.hpp"
 #include "manager.hpp"
+#include "profiler.hpp"
 
 #include <cstring>
 #include <ctime>
@@ -35,12 +36,16 @@ FORCE_INLINE GenericUniquePtr *DataFrameVector<T>::mapping_fn(uint8_t *&state,
 template <typename T>
 FORCE_INLINE DataFrameVector<T>::DataFrameVector(FarMemManager *manager)
     : GenericDataFrameVector(kRealChunkSize, kRealChunkNumEntries,
-                             manager->allocate_ds_id(),
-                             get_dataframe_type_id<T>()),
-      prefetcher_(new Prefetcher<decltype(kInduceFn), decltype(kInferFn),
+                             //manager->allocate_ds_id(),
+                             kVanillaPtrDSID,
+                             get_dataframe_type_id<T>())
+      #ifndef DISABLE_PREFETCHER
+      ,prefetcher_(new Prefetcher<decltype(kInduceFn), decltype(kInferFn),
                                  decltype(kMappingFn)>(
           manager->get_device(), reinterpret_cast<uint8_t *>(&lock_),
-          kRealChunkSize)) {}
+          kRealChunkSize))
+      #endif
+      {}
 
 template <typename T>
 FORCE_INLINE DataFrameVector<T>::DataFrameVector(const DataFrameVector &other)
@@ -262,8 +267,10 @@ template <bool Nt>
 FORCE_INLINE void DataFrameVector<T>::FastIterator<Mut>::update_on_new_chunk() {
   if (likely(chunk_ptr_ <= &dataframe_vec_->chunk_ptrs_.back() &&
              chunk_ptr_ >= &dataframe_vec_->chunk_ptrs_.front())) {
+    #ifndef DISABLE_PREFETCHER
     dataframe_vec_->prefetcher_->add_trace(
         Nt, chunk_ptr_ - &(dataframe_vec_->chunk_ptrs_.front()));
+    #endif
     if constexpr (Mut) {
       data_ptr_begin_ =
           reinterpret_cast<T *>(chunk_ptr_->deref_mut<Nt>(*scope_));
@@ -289,8 +296,16 @@ FORCE_INLINE DataFrameVector<T>::FastIterator<Mut>::FastIterator(
       dataframe_vec_(const_cast<DataFrameVector *>(dataframe_vec)) {
   auto [chunk_idx, chunk_offset] = dataframe_vec_->get_chunk_stats(idx);
   chunk_ptr_ = &(dataframe_vec_->chunk_ptrs_[chunk_idx]);
+  // For an empty vector, chunk_ptr_ is some random address or 0.
+  // resolving it will cause seg fault. Skip it.
+  // This iterator will not be used if the code properly
+  // jumps out of iterating by comparing iteration variable with size()
+  if (dataframe_vec_->size() > 0) {
   update_on_new_chunk<Nt>();
   data_ptr_ = data_ptr_begin_ + chunk_offset;
+  } else {
+    data_ptr_begin_ = data_ptr_end_ = data_ptr_ = nullptr;
+  }
 }
 
 template <typename T>
@@ -454,10 +469,19 @@ operator=(const DataFrameVector &other) {
 
 template <typename T>
 FORCE_INLINE DataFrameVector<T>::DataFrameVector(DataFrameVector &&other)
-    : GenericDataFrameVector(std::move(other.lock())),
-      prefetcher_(std::move(other.prefetcher_)) {
+    : GenericDataFrameVector(std::move(other.lock()))
+  #ifndef DISABLE_PREFETCHER
+      ,prefetcher_(std::move(other.prefetcher_)) {
   prefetcher_->update_state(reinterpret_cast<uint8_t *>(&lock_));
+  #else
+  {
+  #endif
   other.lock_.unlock_writer();
+
+  //prefetcher_.reset(new Prefetcher<decltype(kInduceFn), decltype(kInferFn),
+  //		    decltype(kMappingFn)>(
+  //					  FarMemManagerFactory::get()->get_device(), reinterpret_cast<uint8_t *>(&lock_),
+  //					  kRealChunkSize));
 }
 
 template <typename T>
@@ -465,13 +489,21 @@ FORCE_INLINE DataFrameVector<T> &DataFrameVector<T>::
 operator=(DataFrameVector &&other) {
   auto writer_lock = other.lock_.get_writer_lock();
   GenericDataFrameVector::operator=(std::move(other));
+  #ifndef DISABLE_PREFETCHER
   prefetcher_ = std::move(other.prefetcher_);
   prefetcher_->update_state(reinterpret_cast<uint8_t *>(&lock_));
+  #endif
+  //prefetcher_.reset(new Prefetcher<decltype(kInduceFn), decltype(kInferFn),
+  //		    decltype(kMappingFn)>(
+  //					  FarMemManagerFactory::get()->get_device(), reinterpret_cast<uint8_t *>(&lock_),
+  //					  kRealChunkSize));
   return *this;
 }
 
 template <typename T> FORCE_INLINE DataFrameVector<T>::~DataFrameVector() {
+  #ifndef DISABLE_PREFETCHER
   prefetcher_.reset();
+  #endif
 }
 
 template <typename T>
@@ -494,6 +526,7 @@ FORCE_INLINE void DataFrameVector<T>::expand(uint64_t num) {
 
 template <typename T>
 FORCE_INLINE void DataFrameVector<T>::expand_no_alloc(uint64_t num) {
+  BUG();
   GenericDataFrameVector::expand_no_alloc(
       (num == 0) ? 0 : (num - 1) / kRealChunkNumEntries + 1);
 }
@@ -509,6 +542,7 @@ FORCE_INLINE void DataFrameVector<T>::push_back(const DerefScope &scope,
     expand(kNumEntriesPerExpansion);
   }
   assert(chunk_ptrs_.size() >= chunk_idx);
+  // push_back() use plain dereference
   auto *raw_mut_ptr = chunk_ptrs_[chunk_idx].template deref_mut<Nt>(scope);
   __builtin_memcpy(reinterpret_cast<T *>(raw_mut_ptr) + chunk_offset, &u,
                    sizeof(u));
@@ -738,6 +772,7 @@ DataFrameVector<T>::get_col_unique_values_locally(FarMemManager *manager) {
 template <typename T>
 FORCE_INLINE DataFrameVector<T>
 DataFrameVector<T>::get_col_unique_values_remotely(FarMemManager *manager) {
+  BUG();
   flush();
   auto unique_dataframe_vec = DataFrameVector<T>(manager);
   uint16_t input_len;
@@ -791,6 +826,7 @@ FORCE_INLINE DataFrameVector<T> DataFrameVector<T>::copy_data_by_idx_locally(
 template <typename T>
 FORCE_INLINE DataFrameVector<T> DataFrameVector<T>::copy_data_by_idx_remotely(
     FarMemManager *manager, DataFrameVector<unsigned long long> &idx_vec) {
+  BUG();
   idx_vec.flush();
   flush();
   auto ret = DataFrameVector<T>(manager);
@@ -848,6 +884,7 @@ template <typename T>
 FORCE_INLINE DataFrameVector<T>
 DataFrameVector<T>::shuffle_data_by_idx_remotely(
     FarMemManager *manager, DataFrameVector<unsigned long long> &idx_vec) {
+  BUG();
   idx_vec.flush();
   flush();
   auto ret = DataFrameVector<T>(manager);
@@ -907,6 +944,7 @@ template <typename T>
 FORCE_INLINE void
 DataFrameVector<T>::assign_remotely(const DataFrameVector<T>::Iterator &begin,
                                     const DataFrameVector<T>::Iterator &end) {
+  BUG();
   begin.dataframe_vec_->flush();
   auto begin_flat_idx = begin.get_idx();
   auto end_flat_idx = end.get_idx();
@@ -1080,7 +1118,9 @@ DataFrameVector<T>::static_prefetch(DataFrameVector<T>::Index_t start,
                                     DataFrameVector<T>::Index_t step,
                                     uint32_t num) {
   ACCESS_ONCE(dynamic_prefetch_enabled_) = false;
+  #ifndef DISABLE_PREFETCHER
   prefetcher_->static_prefetch(start, step, num);
+  #endif
 }
 
 } // namespace far_memory

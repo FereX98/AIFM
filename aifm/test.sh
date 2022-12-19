@@ -10,8 +10,8 @@ function run_single_test {
     if [[ $1 == *"tcp"* ]]; then
     	rerun_mem_server
     fi
-    if run_program ./bin/$1 2>/dev/null | grep -q "Passed"; then
-    #if run_program ./bin/$1 2>&1 | tee log.log | grep -q "Passed"; then
+    #if run_program ./bin/$1 2>/dev/null | grep -q "Passed"; then
+    if run_program ./bin/$1 2>&1 | tee log.log | grep -q "Passed"; then
         say_passed
     else
         say_failed
@@ -21,8 +21,10 @@ function run_single_test {
 
 function run_all_tests {
     #TESTS=`ls bin | grep test_`
+    #TESTS=`ls bin | grep test_tcp_df_vector_fast_path`
     #TESTS=`ls bin | grep test_tcp_array_add`
-    TESTS=`ls bin | grep test_tcp_pointer_swap`
+    TESTS=`ls bin | grep test_array_add`
+    #TESTS=`ls bin | grep test_tcp_pointer_swap`
     for test in $TESTS
     do
         run_single_test $test

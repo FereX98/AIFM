@@ -6,6 +6,7 @@ extern "C" {
 #include "device.hpp"
 #include "helpers.hpp"
 #include "manager.hpp"
+#include "profiler.hpp"
 
 #include <algorithm>
 #include <array>
@@ -35,7 +36,7 @@ constexpr uint64_t kNumConnections = 600;
 
 unsigned cycles_low_start, cycles_high_start;
 unsigned cycles_low_end, cycles_high_end;
-UniquePtr<Data_t> ptrs[kNumEntries];
+//UniquePtr<Data_t> ptrs[kNumEntries];
 std::vector<uint64_t> durations;
 
 template <typename T> void print_percentile(int percentile, T *container) {
@@ -43,9 +44,17 @@ template <typename T> void print_percentile(int percentile, T *container) {
   cout << percentile << "\t" << (*container)[idx] << endl;
 }
 
+#include <numeric>
+
 template <typename T> void print_results(T *container) {
   sort(container->begin(), container->end());
+  print_percentile(50, container);
   print_percentile(90, container);
+  print_percentile(99.99, container);
+  print_percentile(100, container);
+  cout << "last one" << "\t" << (*container)[container->size() - 1] << endl;
+  auto const count = static_cast<float>(container->size());
+  cout << "avg" << "\t" << std::reduce(container->begin(), container->end()) / count << endl;
 }
 
 namespace far_memory {
@@ -60,40 +69,55 @@ public:
         std::unique_ptr<FarMemManager>(FarMemManagerFactory::build(
             kCacheSize, kNumGCThreads,
             new TCPDevice(raddr, kNumConnections, kFarMemSize)));
-    for (uint64_t i = 0; i < kNumEntries; i++) {
-      ptrs[i] = std::move(manager->allocate_unique_ptr<Data_t>());
-    }
+
+    auto ptrs = manager->allocate_array<Data_t, kNumEntries>();
+    //for (uint64_t i = 0; i < kNumEntries; i++) {
+    //  ptrs[i] = std::move(manager->allocate_unique_ptr<Data_t>());
+    //}
+    ptrs.disable_prefetch();
+    //auto ptrs2 = manager->allocate_array<Data_t, kNumEntries>();
 
     for (uint64_t i = 0; i < kNumEntries; i++) {
       DerefScope scope;
-      auto *far_mem_ptr = &ptrs[i];
-      const Data_t *raw_const_ptr = far_mem_ptr->deref(scope);
-      ACCESS_ONCE(*raw_const_ptr);
+      //auto *far_mem_ptr = &ptrs[i];
+      //const Data_t *raw_const_ptr = far_mem_ptr->deref(scope);
+      //ACCESS_ONCE(*raw_const_ptr);
+      auto data = ptrs.at_mut(scope, i);
+      ACCESS_ONCE(data);
+      //auto data2 = ptrs2.at_mut(scope, i);
+      //ACCESS_ONCE(data2);
     }
 
     for (uint64_t i = 0; i < kNumEntries; i++) {
-      while (ACCESS_ONCE(far_memory::gc_master_active) ||
-             manager->is_free_cache_low()) {
-        thread_yield();
-      }
+      //while (ACCESS_ONCE(far_memory::gc_master_active) ||
+      //       manager->is_free_cache_low()) {
+      //  thread_yield();
+      //}
       barrier();
       DerefScope scope;
-      auto *far_mem_ptr = &ptrs[i];
-      Stats::reset_measure_read_object_cycles();
+
+      //auto data2 = ptrs2.at_mut(scope, i);
+      //ACCESS_ONCE(data2);
+      //auto *far_mem_ptr = &ptrs[i];
+      //Stats::reset_measure_read_object_cycles();
+      uint64_t cycles = get_cycles_start();
       {
-        const Data_t *raw_const_ptr = far_mem_ptr->deref(scope);
-        ACCESS_ONCE(*raw_const_ptr);
+        //const Data_t *raw_const_ptr = far_mem_ptr->deref(scope);
+        //ACCESS_ONCE(*raw_const_ptr);
+        auto data = ptrs.at_mut(scope, i);
+        ACCESS_ONCE(data);
       }
-      auto read_object_cycles = Stats::get_elapsed_read_object_cycles();
+      //auto read_object_cycles = Stats::get_elapsed_read_object_cycles();
+      auto read_object_cycles = get_cycles_end() - cycles;
       if (read_object_cycles) {
         durations.push_back(read_object_cycles);
       }
     }
 
     print_results(&durations);
-    for (uint64_t i = 0; i < kNumEntries; i++) {
-      ptrs[i].free();
-    }
+    //for (uint64_t i = 0; i < kNumEntries; i++) {
+    //  ptrs[i].free();
+    //}
   }
 } test;
 

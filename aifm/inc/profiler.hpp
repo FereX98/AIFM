@@ -2,7 +2,9 @@
 #include <atomic>
 #include <cstdio>
 
-#define ENABLE_PROFILER
+//#define ENABLE_PROFILER
+
+//#define DISABLE_PREFETCHER
 
 struct overhead_profiler {
     std::atomic<uint64_t> accumulated_cycles;
@@ -11,6 +13,7 @@ struct overhead_profiler {
 
 enum overhead_profiler_type {
     FASTPATH,
+	DEREF_SCOPE,
 	BARRIER_ENTER_SWAP_IN,
 	BARRIER_NOT_PRESENT_SWAP_IN,
 	BARRIER_SWAP_IN_PREP,
@@ -25,6 +28,12 @@ enum overhead_profiler_type {
 	PREFETCH_SWAP_IN_INIT,
 	SERVER_DF_VECTOR_READ,
 	SERVER_PTR_READ,
+	REMOTE_DS_CONSTRUCT,
+	REMOTE_DS_DESTRUCT,
+	REMOTE_DS_EXPAND,
+#ifdef STW_GC
+	STW_GC_LATENCY,
+#endif
     NUM_OVERHEAD_TYPES
 };
 

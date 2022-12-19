@@ -31,7 +31,7 @@ std::unique_ptr<FarMemManager> manager;
 namespace far_memory {
 class FarMemTest {
 private:
-  constexpr static uint64_t kCacheSize = 2048 * Region::kSize;
+  constexpr static uint64_t kCacheSize = 8192 * Region::kSize;
   constexpr static uint64_t kFarMemSize = (1ULL << 30);
   constexpr static uint32_t kNumGCThreads = 100;
   constexpr static uint32_t kKeyLen = 12;
@@ -39,13 +39,13 @@ private:
   constexpr static uint32_t kLocalHashTableNumEntriesShift = 27;
   constexpr static uint32_t kRemoteHashTableNumEntriesShift = 28;
   constexpr static uint64_t kRemoteHashTableDataSize = (4ULL << 30); // 4 GB
-  constexpr static uint32_t kNumKVPairs = 1 << 27;
+  constexpr static uint32_t kNumKVPairs = 1 << 22;
   constexpr static uint32_t kNumItersPerScope = 64;
-  constexpr static uint32_t kNumMutatorThreads = 400;
+  constexpr static uint32_t kNumMutatorThreads = 20;
   constexpr static uint32_t kReqSeqLenPerCore = kNumKVPairs;
   constexpr static uint32_t kNumConnections = 650;
   constexpr static uint32_t kMonitorPerIter = 262144;
-  constexpr static uint32_t kMinMonitorIntervalUs = 10 * 1000 * 1000;
+  constexpr static uint32_t kMinMonitorIntervalUs = 5 * 1000 * 1000;
   constexpr static uint32_t kMaxRunningUs = 200 * 1000 * 1000; // 200 seconds
   constexpr static double kZipfParamS = 0;
 
@@ -133,6 +133,7 @@ private:
     for (auto &thread : threads) {
       thread.Join();
     }
+    cout << "load end" << endl;
     preempt_disable();
     zipf_table_distribution<> zipf(kNumKVPairs, kZipfParamS);
     auto &generator = generators[get_core_num()];
@@ -159,6 +160,7 @@ private:
         us = microtime();
         auto mops = (double)(sum_cnts - prev_sum_cnts) / (us - prev_us);
         mops_vec.push_back(mops);
+        cout << "mops: " << mops << endl;
         running_us += (us - prev_us);
         if (running_us >= kMaxRunningUs) {
           std::vector<double> last_5_mops(

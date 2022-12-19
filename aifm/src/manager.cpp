@@ -756,6 +756,9 @@ retry_allocate_far_mem:
 }
 
 void FarMemManager::mutator_wait_for_gc_cache() {
+#ifdef STW_GC
+  uint64_t cycles = get_cycles_start();
+#endif
   assert(preempt_enabled());
   gc_lock_.Lock();
   auto guard = helpers::finally([&]() { gc_lock_.Unlock(); });
@@ -776,6 +779,10 @@ void FarMemManager::mutator_wait_for_gc_cache() {
   guard.reset();
 #ifdef DEBUG
   LOG_PRINTF("%s\n", "Warn: mutator paused due to insufficient memory.");
+#endif
+#ifdef STW_GC
+  cycles = get_cycles_end() - cycles;
+  record_overhead(STW_GC_LATENCY, cycles);
 #endif
 }
 

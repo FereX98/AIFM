@@ -94,6 +94,8 @@ public:
   template <bool Nt = false, typename... Indices>
   T &at_mut(const DerefScope &scope, Indices... indices) noexcept;
   template <bool Nt = false, typename... Indices>
+  T &at_mut_flat(const DerefScope &scope, size_t index) noexcept;
+  template <bool Nt = false, typename... Indices>
   T &at_mut_safe(const DerefScope &scope, Indices... indices);
   template <bool Nt = false, typename U, typename... Indices>
   void write(U &&u, Indices... indices);

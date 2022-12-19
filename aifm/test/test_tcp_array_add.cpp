@@ -18,15 +18,19 @@ extern "C" {
 #include <cstdio>
 
 #define RUN_THE_TEST
-//#define RUN_AIFM
-#define RUN_UNMODIFIED
+#define RUN_AIFM
+//#define RUN_UNMODIFIED
 
 #ifdef RUN_AIFM
-//#define DISABLE_PREFETCH
+#define DISABLE_PREFETCH
 #endif // RUN_AIFM
 
 using namespace far_memory;
 using namespace std;
+
+typedef struct {
+  uint64_t data[16];
+} Data;
 
 //constexpr static uint64_t kCacheSize = (128ULL << 20);
 constexpr static uint64_t kCacheSize = (8ULL << 30);
@@ -45,9 +49,16 @@ uint64_t raw_array_C[kNumEntries];
 
 template <uint64_t N, typename T>
 void copy_array(Array<T, N> *array, T *raw_array) {
+  DerefScope scope;
   for (uint64_t i = 0; i < N; i++) {
-    DerefScope scope;
     (*array).at_mut(scope, i) = raw_array[i];
+  }
+}
+
+template <uint64_t N, typename T>
+void copy_array_flat(Array<T, N> *array, T *raw_array, DerefScope &scope) {
+  for (uint64_t i = 0; i < N; i++) {
+    ((*array).at_mut_flat(scope, i))[0] = raw_array[i];
   }
 }
 
@@ -83,11 +94,44 @@ void gen_random_array(uint64_t num_entries, uint64_t *raw_array) {
 
 void do_work(FarMemManager *manager) {
   #ifdef RUN_THE_TEST
+
+  uint64_t empty_sum = 0;
+  uint64_t empty_number = 0;
+  uint64_t deref_sum = 0;
+  uint64_t deref_number = 0;
+  for (int i = 0; i < 1000; ++i) {
+    uint64_t cycles = get_cycles_start();
+    cycles = get_cycles_end() - cycles;
+    cout << "empty test " << cycles << endl;
+    if (cycles < 40) {
+      empty_sum += cycles;
+      empty_number++;
+    }
+    cycles = get_cycles_start();
+    {
+      DerefScope scope;
+    }
+    cycles = get_cycles_end() - cycles;
+    cout << "deref scope " << cycles << endl;
+    if (cycles < 60) {
+      deref_sum += cycles;
+      deref_number++;
+    }
+  }
+  cout << "empty sum   " << empty_sum << endl;
+  cout << "empty count " << empty_number << endl;
+  cout << "deref sum   " << deref_sum << endl;
+  cout << "deref count " << deref_number << endl;
+  cout << "Passed" << endl;
+  return;
+
   #ifdef RUN_AIFM
-  auto array_A = manager->allocate_array<uint64_t, kNumEntries>();
+  auto array_A = manager->allocate_array<Data, kNumEntries>();
   auto array_B = manager->allocate_array<uint64_t, kNumEntries>();
   auto array_C = manager->allocate_array<uint64_t, kNumEntries>();
   #endif // RUN_AIFM
+
+  
 
   #ifdef DISABLE_PREFETCH
   array_A.disable_prefetch();
@@ -97,14 +141,10 @@ void do_work(FarMemManager *manager) {
 
   #ifdef RUN_UNMODIFIED
   printf("array creation\n");
-  uint64_t** array_A = (uint64_t**)malloc(kNumEntries * sizeof(uint64_t));
-  uint64_t** array_B = (uint64_t**)malloc(kNumEntries * sizeof(uint64_t));
-  uint64_t** array_C = (uint64_t**)malloc(kNumEntries * sizeof(uint64_t));
-  uint64_t* buffer = (uint64_t*)malloc(kNumEntries * sizeof(uint64_t));
+  Data** array_A = (Data**)malloc(kNumEntries * sizeof(Data*));
+  Data* buffer = (Data*)malloc(kNumEntries * sizeof(Data));
   for (uint64_t i = 0; i < kNumEntries; ++i) {
     array_A[i] = &buffer[i];
-    array_B[i] = (uint64_t*)malloc(sizeof(uint64_t));
-    array_C[i] = (uint64_t*)malloc(sizeof(uint64_t));
   }
   printf("array created\n");
   #endif // RUN_UNMODIFIED
@@ -116,79 +156,41 @@ void do_work(FarMemManager *manager) {
   printf("start copying\n");
 
   for (uint64_t i = 0; i < kNumEntries; i++) {
-    *array_A[i] = raw_array_B[i];
+    (*array_A[i]).data[0] = raw_array_B[i];
   }
-  cout << "rehearsal" << *(array_A[rand() % kNumEntries]) << endl;
+  cout << "rehearsal" << (*(array_A[rand() % kNumEntries])).data[0] << endl;
 
   uint64_t start_cycles = get_cycles_start();
   for (uint64_t i = 0; i < kNumEntries; i++) {
-    *array_A[i] = raw_array_A[i];
+    (*array_A[i]).data[0] = raw_array_A[i];
   }
   uint64_t end_cycles = get_cycles_end();
-  cout << *(array_A[rand() % kNumEntries]) << endl;
+  cout << (*(array_A[rand() % kNumEntries])).data[0] << endl;
   cout << "copy array A: " << end_cycles - start_cycles << endl;
   cout << "Passed" << endl;
   return;
-  for (uint64_t i = 0; i < kNumEntries; i++) {
-    *array_B[i] = raw_array_B[i];
-  }
-  printf("end copying\n");
-  for (uint64_t i = 0; i < kNumEntries; i++) {
-    *array_C[i] = *array_A[i] + *array_B[i];
-  }
-  printf("end adding\n");
-  uint64_t counter = 0;
-  for (uint64_t i = 0; i < kNumEntries; i++) {
-    if (*array_C[i] != raw_array_A[i] + raw_array_B[i]) {
-  //    //FILE* fp;
-  //    //fp = fopen("/users/shiliu/AIFM/aifm/file.txt", "w");
-  //    //fprintf(fp, "%lu\n%lu\n%lu\n%lu\n", i, raw_array_A[i], raw_array_B[i], array_C[i]);
-      //cout << i << endl;
-      //cout << raw_array_A[i] << endl;
-      //cout << raw_array_B[i] << endl;
-      //cout << array_C[i] << endl;
-      // Shi: no idea why this comparison will fail, use a counter to make sure it runs to the end for now.
-      //counter += 1;
-      //goto fail;
-      //cout << "Failed" << endl;
-      //return;
-    }
-  }
   #endif // RUN_UNMODIFIED
 
   #ifdef RUN_AIFM
-
-  copy_array(&array_A, raw_array_B);
   DerefScope scope;
-  cout << "rehearsal" << array_A.at(scope, rand() % kNumEntries) << endl;
+  for (uint64_t i = 0; i < kNumEntries; i++) {
+    (array_A.at_mut(scope, i)).data[0] = raw_array_B[i];
+  }
+  cout << "rehearsal" << array_A.at(scope, rand() % kNumEntries).data[0] << endl;
 
   uint64_t start_cycles = get_cycles_start();
-  copy_array_deref_only(&array_A, raw_array_A);
+  for (uint64_t i = 0; i < kNumEntries; i++) {
+    (array_A.at_mut_flat(scope, i)).data[0] = raw_array_A[i];
+  }
   uint64_t end_cycles = get_cycles_end();
 
-  cout << array_A.at(scope, rand() % kNumEntries) << endl;
+  cout << array_A.at(scope, rand() % kNumEntries).data[0] << endl;
   cout << "copy array A: " << end_cycles - start_cycles << endl;
   cout << "Passed" << endl;
   return;
-  copy_array(&array_B, raw_array_B);
-  add_array(&array_C, &array_A, &array_B);
-
-  for (uint64_t i = 0; i < kNumEntries; i++) {
-    DerefScope scope;
-    if (array_C.at(scope, i) != raw_array_A[i] + raw_array_B[i]) {
-      //goto fail;
-      cout << "Failed" << endl;
-      return;
-    }
-  }
   #endif // RUN_AIFM
   #endif // RUN_THE_TEST
 
-  cout << "Passed" << endl;
-  return;
-
-//fail:
-//  cout << "Failed" << endl;
 }
 
 int argc;
