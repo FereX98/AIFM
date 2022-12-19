@@ -73,8 +73,11 @@ private:
   uint8_t ds_id_;
   uint64_t size_ = 0;
   uint64_t remote_vec_capacity_ = 0;
-  ReaderWriterLock lock_;
-  std::vector<GenericUniquePtr> chunk_ptrs_;
+  struct prefetcher_duo {
+    ReaderWriterLock lock_;
+    std::vector<GenericUniquePtr> chunk_ptrs_;
+  };
+  std::shared_ptr<struct prefetcher_duo> duo;
   bool moved_ = false;
   bool dirty_ = false;
   uint64_t last_idx_ = std::numeric_limits<uint64_t>::max();
@@ -107,12 +110,12 @@ private:
   using Pattern_t = int64_t;
 
   // Be reminded that this parameter on memory server also needed to be changed and recompiled
-  constexpr static uint32_t kPreferredChunkSize = 4096;
+  constexpr static uint32_t kPreferredChunkSize = 512;
   constexpr static uint32_t kRealChunkNumEntries =
       std::max(static_cast<uint32_t>(1),
                helpers::round_up_power_of_two(kPreferredChunkSize / sizeof(T)));
   constexpr static uint32_t kRealChunkSize = sizeof(T) * kRealChunkNumEntries;
-  constexpr static uint32_t kSizePerExpansion = 4 << 20; // 4 MiB.
+  constexpr static uint32_t kSizePerExpansion = 512; // 4 MiB.
   constexpr static uint32_t kNumEntriesPerExpansion =
       (kSizePerExpansion - 1) / sizeof(T) + 1;
   constexpr static uint64_t kNumElementsPerScope = 1024;
@@ -135,7 +138,7 @@ private:
   std::unique_ptr<
       Prefetcher<decltype(kInduceFn), decltype(kInferFn), decltype(kMappingFn)>>
       prefetcher_;
-  // bool dynamic_prefetch_enabled_ = false;  
+  //bool dynamic_prefetch_enabled_ = false;  
   bool dynamic_prefetch_enabled_ = true;  
 
   friend class FarMemTest;

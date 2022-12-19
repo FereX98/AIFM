@@ -35,11 +35,12 @@ FORCE_INLINE GenericUniquePtr *DataFrameVector<T>::mapping_fn(uint8_t *&state,
 template <typename T>
 FORCE_INLINE DataFrameVector<T>::DataFrameVector(FarMemManager *manager)
     : GenericDataFrameVector(kRealChunkSize, kRealChunkNumEntries,
-                             manager->allocate_ds_id(),
+//                             manager->allocate_ds_id(),
+                             kVanillaPtrDSID,
                              get_dataframe_type_id<T>()),
       prefetcher_(new Prefetcher<decltype(kInduceFn), decltype(kInferFn),
                                  decltype(kMappingFn)>(
-          manager->get_device(), reinterpret_cast<uint8_t *>(&lock_),
+          manager->get_device(), reinterpret_cast<uint8_t *>(&duo->lock_),
           kRealChunkSize)) {}
 
 template <typename T>
@@ -91,7 +92,7 @@ GenericDataFrameVector::GenericDataFrameVector(GenericDataFrameVector &&other)
     : chunk_size_(other.chunk_size_),
       chunk_num_entries_(other.chunk_num_entries_), device_(other.device_),
       ds_id_(other.ds_id_), size_(other.size_),
-      chunk_ptrs_(std::move(other.chunk_ptrs_)), moved_(false),
+      duo(std::move(other.duo)), moved_(false),
       dirty_(other.dirty_) {
   assert(!other.moved_);
   other.moved_ = true;
@@ -105,7 +106,7 @@ operator=(GenericDataFrameVector &&other) {
   device_ = other.device_;
   ds_id_ = other.ds_id_;
   size_ = other.size_;
-  chunk_ptrs_ = std::move(other.chunk_ptrs_);
+  duo = std::move(other.duo);
   moved_ = false;
   dirty_ = other.dirty_;
   other.moved_ = true;
@@ -230,11 +231,11 @@ operator>=(const Iterator &other) const {
 
 template <typename T>
 FORCE_INLINE T DataFrameVector<T>::Iterator::operator*() const {
-  assert(dataframe_vec_->chunk_ptrs_.size() > chunk_idx_);
+  assert(dataframe_vec_->duo->chunk_ptrs_.size() > chunk_idx_);
   DerefScope scope;
   // operator*() does not accept any argument, so we always leave prefetch on.
   dataframe_vec_->prefetch_record(/* nt = */ false, chunk_idx_);
-  auto *raw_ptr = dataframe_vec_->chunk_ptrs_[chunk_idx_].template deref(scope);
+  auto *raw_ptr = dataframe_vec_->duo->chunk_ptrs_[chunk_idx_].template deref(scope);
   return *(reinterpret_cast<const T *>(raw_ptr) + chunk_offset_);
 }
 
@@ -242,7 +243,7 @@ template <typename T>
 template <bool Mut>
 FORCE_INLINE uint64_t DataFrameVector<T>::FastIterator<Mut>::get_idx() const {
   return (data_ptr_ - data_ptr_begin_) +
-         (chunk_ptr_ - &(dataframe_vec_->chunk_ptrs_.front())) *
+         (chunk_ptr_ - &(dataframe_vec_->duo->chunk_ptrs_.front())) *
              kRealChunkNumEntries;
 }
 
@@ -260,10 +261,11 @@ template <typename T>
 template <bool Mut>
 template <bool Nt>
 FORCE_INLINE void DataFrameVector<T>::FastIterator<Mut>::update_on_new_chunk() {
-  if (likely(chunk_ptr_ <= &dataframe_vec_->chunk_ptrs_.back() &&
-             chunk_ptr_ >= &dataframe_vec_->chunk_ptrs_.front())) {
+  if (likely(chunk_ptr_ <= &dataframe_vec_->duo->chunk_ptrs_.back() &&
+             chunk_ptr_ >= &dataframe_vec_->duo->chunk_ptrs_.front())) {
+    // disable prefetch
     dataframe_vec_->prefetcher_->add_trace(
-        Nt, chunk_ptr_ - &(dataframe_vec_->chunk_ptrs_.front()));
+        Nt, chunk_ptr_ - &(dataframe_vec_->duo->chunk_ptrs_.front()));
     if constexpr (Mut) {
       data_ptr_begin_ =
           reinterpret_cast<T *>(chunk_ptr_->deref_mut<Nt>(*scope_));
@@ -288,9 +290,17 @@ FORCE_INLINE DataFrameVector<T>::FastIterator<Mut>::FastIterator(
     : scope_(&scope),
       dataframe_vec_(const_cast<DataFrameVector *>(dataframe_vec)) {
   auto [chunk_idx, chunk_offset] = dataframe_vec_->get_chunk_stats(idx);
-  chunk_ptr_ = &(dataframe_vec_->chunk_ptrs_[chunk_idx]);
-  update_on_new_chunk<Nt>();
-  data_ptr_ = data_ptr_begin_ + chunk_offset;
+  chunk_ptr_ = &(dataframe_vec_->duo->chunk_ptrs_[chunk_idx]);
+  // For an empty vector, chunk_ptr_ is some random address or 0.
+  // resolving it will cause seg fault. Skip it.
+  // This iterator will not be used if the code properly
+  // jumps out of iterating by comparing iteration variable with size()
+  if (dataframe_vec_->size() > 0) {
+    update_on_new_chunk<Nt>();
+    data_ptr_ = data_ptr_begin_ + chunk_offset;
+  } else {
+    data_ptr_begin_ = data_ptr_end_ = data_ptr_ = nullptr;
+  }
 }
 
 template <typename T>
@@ -454,19 +464,29 @@ operator=(const DataFrameVector &other) {
 
 template <typename T>
 FORCE_INLINE DataFrameVector<T>::DataFrameVector(DataFrameVector &&other)
-    : GenericDataFrameVector(std::move(other.lock())),
-      prefetcher_(std::move(other.prefetcher_)) {
-  prefetcher_->update_state(reinterpret_cast<uint8_t *>(&lock_));
-  other.lock_.unlock_writer();
+  : GenericDataFrameVector(std::move(other.lock())),
+      prefetcher_(std::move(other.prefetcher_))
+{
+  //prefetcher_->update_state(reinterpret_cast<uint8_t *>(&duo->lock_));
+  duo->lock_.unlock_writer();
+
+  // prefetcher_.reset(new Prefetcher<decltype(kInduceFn), decltype(kInferFn),
+  // 		    decltype(kMappingFn)>(
+  // 					  FarMemManagerFactory::get()->get_device(), reinterpret_cast<uint8_t *>(&duo->lock_),
+  // 					  kRealChunkSize));
 }
 
 template <typename T>
 FORCE_INLINE DataFrameVector<T> &DataFrameVector<T>::
 operator=(DataFrameVector &&other) {
-  auto writer_lock = other.lock_.get_writer_lock();
+  auto writer_lock = other.duo->lock_.get_writer_lock();
   GenericDataFrameVector::operator=(std::move(other));
   prefetcher_ = std::move(other.prefetcher_);
-  prefetcher_->update_state(reinterpret_cast<uint8_t *>(&lock_));
+  //prefetcher_->update_state(reinterpret_cast<uint8_t *>(&duo->lock_));
+  // prefetcher_.reset(new Prefetcher<decltype(kInduceFn), decltype(kInferFn),
+  // 		    decltype(kMappingFn)>(
+  // 					  FarMemManagerFactory::get()->get_device(), reinterpret_cast<uint8_t *>(&duo->lock_),
+  // 					  kRealChunkSize));
   return *this;
 }
 
@@ -476,7 +496,7 @@ template <typename T> FORCE_INLINE DataFrameVector<T>::~DataFrameVector() {
 
 template <typename T>
 FORCE_INLINE uint64_t DataFrameVector<T>::capacity() const {
-  return chunk_ptrs_.size() * kRealChunkNumEntries;
+  return duo->chunk_ptrs_.size() * kRealChunkNumEntries;
 }
 
 template <typename T>
@@ -494,6 +514,7 @@ FORCE_INLINE void DataFrameVector<T>::expand(uint64_t num) {
 
 template <typename T>
 FORCE_INLINE void DataFrameVector<T>::expand_no_alloc(uint64_t num) {
+  BUG();
   GenericDataFrameVector::expand_no_alloc(
       (num == 0) ? 0 : (num - 1) / kRealChunkNumEntries + 1);
 }
@@ -505,11 +526,11 @@ FORCE_INLINE void DataFrameVector<T>::push_back(const DerefScope &scope,
   static_assert(std::is_same<std::decay_t<U>, std::decay_t<T>>::value,
                 "U must be the same as T");
   auto [chunk_idx, chunk_offset] = get_chunk_stats(size_++);
-  if (unlikely(chunk_ptrs_.size() == chunk_idx)) {
+  if (unlikely(duo->chunk_ptrs_.size() == chunk_idx)) {
     expand(kNumEntriesPerExpansion);
   }
-  assert(chunk_ptrs_.size() >= chunk_idx);
-  auto *raw_mut_ptr = chunk_ptrs_[chunk_idx].template deref_mut<Nt>(scope);
+  assert(duo->chunk_ptrs_.size() >= chunk_idx);
+  auto *raw_mut_ptr = duo->chunk_ptrs_[chunk_idx].template deref_mut<Nt>(scope);
   __builtin_memcpy(reinterpret_cast<T *>(raw_mut_ptr) + chunk_offset, &u,
                    sizeof(u));
   prefetch_record(Nt, chunk_idx);
@@ -622,12 +643,12 @@ template <bool Prefetch, bool Nt>
 FORCE_INLINE T &DataFrameVector<T>::at_mut(const DerefScope &scope,
                                            uint64_t index) {
   auto [chunk_idx, chunk_offset] = get_chunk_stats(index);
-  assert(chunk_ptrs_.size() > chunk_idx);
+  assert(duo->chunk_ptrs_.size() > chunk_idx);
   if constexpr (Prefetch) {
     prefetch_record(Nt, chunk_idx);
   }
   dirty_ = true;
-  auto *raw_mut_ptr = chunk_ptrs_[chunk_idx].template deref_mut<Nt>(scope);
+  auto *raw_mut_ptr = duo->chunk_ptrs_[chunk_idx].template deref_mut<Nt>(scope);
   return *(reinterpret_cast<T *>(raw_mut_ptr) + chunk_offset);
 }
 
@@ -636,11 +657,11 @@ template <bool Prefetch, bool Nt>
 FORCE_INLINE const T &DataFrameVector<T>::at(const DerefScope &scope,
                                              uint64_t index) {
   auto [chunk_idx, chunk_offset] = get_chunk_stats(index);
-  assert(chunk_ptrs_.size() > chunk_idx);
+  assert(duo->chunk_ptrs_.size() > chunk_idx);
   if constexpr (Prefetch) {
     prefetch_record(Nt, chunk_idx);
   }
-  auto *raw_ptr = chunk_ptrs_[chunk_idx].template deref<Nt>(scope);
+  auto *raw_ptr = duo->chunk_ptrs_[chunk_idx].template deref<Nt>(scope);
   return *(reinterpret_cast<const T *>(raw_ptr) + chunk_offset);
 }
 
@@ -738,6 +759,7 @@ DataFrameVector<T>::get_col_unique_values_locally(FarMemManager *manager) {
 template <typename T>
 FORCE_INLINE DataFrameVector<T>
 DataFrameVector<T>::get_col_unique_values_remotely(FarMemManager *manager) {
+  BUG();
   flush();
   auto unique_dataframe_vec = DataFrameVector<T>(manager);
   uint16_t input_len;
@@ -791,6 +813,7 @@ FORCE_INLINE DataFrameVector<T> DataFrameVector<T>::copy_data_by_idx_locally(
 template <typename T>
 FORCE_INLINE DataFrameVector<T> DataFrameVector<T>::copy_data_by_idx_remotely(
     FarMemManager *manager, DataFrameVector<unsigned long long> &idx_vec) {
+  BUG();
   idx_vec.flush();
   flush();
   auto ret = DataFrameVector<T>(manager);
@@ -848,6 +871,7 @@ template <typename T>
 FORCE_INLINE DataFrameVector<T>
 DataFrameVector<T>::shuffle_data_by_idx_remotely(
     FarMemManager *manager, DataFrameVector<unsigned long long> &idx_vec) {
+  BUG();
   idx_vec.flush();
   flush();
   auto ret = DataFrameVector<T>(manager);
@@ -907,6 +931,7 @@ template <typename T>
 FORCE_INLINE void
 DataFrameVector<T>::assign_remotely(const DataFrameVector<T>::Iterator &begin,
                                     const DataFrameVector<T>::Iterator &end) {
+  BUG();
   begin.dataframe_vec_->flush();
   auto begin_flat_idx = begin.get_idx();
   auto end_flat_idx = end.get_idx();
@@ -1062,7 +1087,7 @@ DataFrameVector<T>::aggregate_median(FarMemManager *manager, const U &key_vec) {
 
 template <typename T>
 FORCE_INLINE DataFrameVector<T> &DataFrameVector<T>::lock() {
-  lock_.lock_writer();
+  duo->lock_.lock_writer();
   return *this;
 }
 
