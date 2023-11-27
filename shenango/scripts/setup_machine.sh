@@ -20,6 +20,7 @@ chmod uga+rwx /dev/pcicfg
 
 # reserve huge pages
 echo 8192 > /sys/devices/system/node/node0/hugepages/hugepages-2048kB/nr_hugepages
+echo 8192 > /sys/devices/system/node/node1/hugepages/hugepages-2048kB/nr_hugepages
 
 # revoke any CAT settings
 modprobe msr
@@ -34,5 +35,5 @@ echo 2 > /sys/devices/cpu/rdpmc
 # THP is only used with madvise
 echo madvise > /sys/kernel/mm/transparent_hugepage/enabled
 
-# Enable turbo boost
-echo 0 > /sys/devices/system/cpu/intel_pstate/no_turbo
+# Disable turbo boost
+echo 1 > /sys/devices/system/cpu/intel_pstate/no_turbo

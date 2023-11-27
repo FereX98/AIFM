@@ -335,7 +335,8 @@ int mlx5_common_init(struct hardware_q **rxq_out, struct direct_txq **txq_out,
 
 	i = 0;
 	while ((ib_dev = dev_list[i])) {
-		if (strncmp(ibv_get_device_name(ib_dev), "mlx5_3", 6) == 0)
+		printf("ib_dev %d, name: %s\n",i,ibv_get_device_name(ib_dev));
+		if (strncmp(ibv_get_device_name(ib_dev), "mlx5_2", 6) == 0)
 			break;
 		i++;
 	}

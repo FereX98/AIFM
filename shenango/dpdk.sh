@@ -13,7 +13,8 @@ git submodule update --recursive
 
 # Apply driver patches
 patch -p 1 -d dpdk/ < ixgbe_18_11.patch
-
+patch -d  dpdk/lib/librte_ethdev/ < ../../dpdk_port.patch
+patch -d dpdk/mk/toolchain/gcc/ < ../../dpdk_error.patch
 
 if lspci | grep -q 'ConnectX-[4,5]'; then
    patch -p 1 -d dpdk/ < mlx5_18_11.patch
