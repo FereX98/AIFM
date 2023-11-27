@@ -1,0 +1,14 @@
+--- dpdk/mk/toolchain/gcc/rte.vars.mk   2022-10-05 20:23:47.675877669 +0800
++++ rte.vars.mk 2022-10-05 20:23:20.783725994 +0800
+@@ -87,5 +87,11 @@
+ WERROR_FLAGS += -Wno-format-truncation
+ endif
+
++#Report "taking address of packed member may result
++#in an unaligned pointer value" issues as warnings.
++WERROR_FLAGS += -Wno-error=address-of-packed-member
++WERROR_FLAGS += -Wno-error=format-overflow
++WERROR_FLAGS += -Wno-error=incompatible-pointer-types
++WERROR_FLAGS += -Wno-error=maybe-uninitialized
+ export CC AS AR LD OBJCOPY OBJDUMP STRIP READELF
+ export TOOLCHAIN_CFLAGS TOOLCHAIN_LDFLAGS TOOLCHAIN_ASFLAGS

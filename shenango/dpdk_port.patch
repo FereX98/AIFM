@@ -1,0 +1,12 @@
+--- dpdk/lib/librte_ethdev/rte_ethdev.c	2022-10-27 11:41:01.725365792 +0800
++++ rte_ethdev.c	2022-10-27 11:43:58.437358017 +0800
+@@ -538,6 +538,9 @@
+ int
+ rte_eth_dev_is_valid_port(uint16_t port_id)
+ {
++	int i;
++	for(i=0;i<RTE_MAX_ETHPORTS && rte_eth_devices[i].device!=NULL;i++)
++		printf("i = %d, eth name : %s\n",i,rte_eth_devices[port_id].device->name);
+ 	if (port_id >= RTE_MAX_ETHPORTS ||
+ 	    (rte_eth_devices[port_id].state == RTE_ETH_DEV_UNUSED))
+ 		return 0;

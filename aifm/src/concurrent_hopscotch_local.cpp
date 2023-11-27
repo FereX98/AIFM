@@ -71,7 +71,7 @@ GenericConcurrentHopscotchLocal::~GenericConcurrentHopscotchLocal() {
 void GenericConcurrentHopscotchLocal::do_evac_notifier(EvacNotifierMeta meta) {
   auto *bucket =
       reinterpret_cast<BucketEntry *>(static_cast<uint64_t>(meta.anchor_addr));
-  auto *entry = bucket + meta.offset;
+  //auto *entry = bucket + meta.offset;
   // Shi: This function should never be called.
   BUG();
   //entry->ptr.nullify();
@@ -110,7 +110,6 @@ bool GenericConcurrentHopscotchLocal::_put(uint8_t key_len, const uint8_t *key,
                                       bool swap_in) {
   uint32_t hash = hash_32(static_cast<const void *>(key), key_len);
   uint32_t bucket_idx = hash & kHashMask_;
-retry:
   auto *bucket = &(buckets_[bucket_idx]);
   auto orig_bucket_idx = bucket_idx;
 
